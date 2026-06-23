@@ -11,9 +11,13 @@ $stmt = db()->prepare("
         SELECT total, qty FROM sales WHERE sale_date BETWEEN ? AND ?
         UNION ALL
         SELECT total, qty FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
+        UNION ALL
+        SELECT deposit_paid AS total, 0 AS qty FROM events WHERE deposit_paid > 0 AND deposit_date BETWEEN ? AND ?
+        UNION ALL
+        SELECT balance_paid AS total, 0 AS qty FROM events WHERE balance_paid > 0 AND balance_paid_date BETWEEN ? AND ?
     ) report_sales
 ");
-$stmt->execute([$startDate, $endDate, $startDate, $endDate]);
+$stmt->execute([$startDate, $endDate, $startDate, $endDate, $startDate, $endDate, $startDate, $endDate]);
 $salesTotals = $stmt->fetch();
 
 $stmt = db()->prepare('SELECT COALESCE(SUM(amount),0) FROM expenses WHERE expense_date BETWEEN ? AND ?');
@@ -26,10 +30,14 @@ $stmt = db()->prepare("
         SELECT sale_type, total, qty FROM sales WHERE sale_date BETWEEN ? AND ?
         UNION ALL
         SELECT 'Tempahan' AS sale_type, total, qty FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
+        UNION ALL
+        SELECT 'Event' AS sale_type, deposit_paid AS total, 0 AS qty FROM events WHERE deposit_paid > 0 AND deposit_date BETWEEN ? AND ?
+        UNION ALL
+        SELECT 'Event' AS sale_type, balance_paid AS total, 0 AS qty FROM events WHERE balance_paid > 0 AND balance_paid_date BETWEEN ? AND ?
     ) report_sales
     GROUP BY sale_type
 ");
-$stmt->execute([$startDate, $endDate, $startDate, $endDate]);
+$stmt->execute([$startDate, $endDate, $startDate, $endDate, $startDate, $endDate, $startDate, $endDate]);
 $breakdowns = $stmt->fetchAll();
 
 $breakdownMap = [];
@@ -37,7 +45,7 @@ foreach ($breakdowns as $row) {
     $breakdownMap[$row['sale_type']] = $row;
 }
 
-$saleTypes = ['Gerai', 'Tempahan', 'Frozen', 'Catering'];
+$saleTypes = ['Gerai', 'Tempahan', 'Frozen', 'Catering', 'Event'];
 $query = http_build_query(['filter' => $filter, 'start_date' => $startDate, 'end_date' => $endDate]);
 
 $pageTitle = 'Reports';

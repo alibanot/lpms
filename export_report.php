@@ -11,10 +11,14 @@ $stmt = db()->prepare("
         SELECT sale_type, qty, total FROM sales WHERE sale_date BETWEEN ? AND ?
         UNION ALL
         SELECT 'Tempahan' AS sale_type, qty, total FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
+        UNION ALL
+        SELECT 'Event' AS sale_type, 0 AS qty, deposit_paid AS total FROM events WHERE deposit_paid > 0 AND deposit_date BETWEEN ? AND ?
+        UNION ALL
+        SELECT 'Event' AS sale_type, 0 AS qty, balance_paid AS total FROM events WHERE balance_paid > 0 AND balance_paid_date BETWEEN ? AND ?
     ) report_sales
     GROUP BY sale_type
 ");
-$stmt->execute([$startDate, $endDate, $startDate, $endDate]);
+$stmt->execute([$startDate, $endDate, $startDate, $endDate, $startDate, $endDate, $startDate, $endDate]);
 $rows = $stmt->fetchAll();
 
 $stmt = db()->prepare("
@@ -23,9 +27,13 @@ $stmt = db()->prepare("
         SELECT total, qty FROM sales WHERE sale_date BETWEEN ? AND ?
         UNION ALL
         SELECT total, qty FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
+        UNION ALL
+        SELECT deposit_paid AS total, 0 AS qty FROM events WHERE deposit_paid > 0 AND deposit_date BETWEEN ? AND ?
+        UNION ALL
+        SELECT balance_paid AS total, 0 AS qty FROM events WHERE balance_paid > 0 AND balance_paid_date BETWEEN ? AND ?
     ) report_sales
 ");
-$stmt->execute([$startDate, $endDate, $startDate, $endDate]);
+$stmt->execute([$startDate, $endDate, $startDate, $endDate, $startDate, $endDate, $startDate, $endDate]);
 [$totalSales, $totalQty] = $stmt->fetch(PDO::FETCH_NUM);
 
 $stmt = db()->prepare('SELECT COALESCE(SUM(amount),0) FROM expenses WHERE expense_date BETWEEN ? AND ?');

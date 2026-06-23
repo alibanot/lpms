@@ -12,9 +12,13 @@ $stmt = db()->prepare("
         SELECT total, qty FROM sales WHERE sale_date = ?
         UNION ALL
         SELECT total, qty FROM orders WHERE status = 'Completed' AND pickup_date = ?
+        UNION ALL
+        SELECT deposit_paid AS total, 0 AS qty FROM events WHERE deposit_paid > 0 AND deposit_date = ?
+        UNION ALL
+        SELECT balance_paid AS total, 0 AS qty FROM events WHERE balance_paid > 0 AND balance_paid_date = ?
     ) dashboard_sales
 ");
-$stmt->execute([$today, $today]);
+$stmt->execute([$today, $today, $today, $today]);
 $todaySales = $stmt->fetch();
 
 $stmt = db()->prepare('SELECT COALESCE(SUM(amount),0) total FROM expenses WHERE expense_date = ?');
@@ -27,9 +31,13 @@ $stmt = db()->prepare("
         SELECT total, qty FROM sales WHERE sale_date BETWEEN ? AND ?
         UNION ALL
         SELECT total, qty FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
+        UNION ALL
+        SELECT deposit_paid AS total, 0 AS qty FROM events WHERE deposit_paid > 0 AND deposit_date BETWEEN ? AND ?
+        UNION ALL
+        SELECT balance_paid AS total, 0 AS qty FROM events WHERE balance_paid > 0 AND balance_paid_date BETWEEN ? AND ?
     ) dashboard_sales
 ");
-$stmt->execute([$monthStart, $monthEnd, $monthStart, $monthEnd]);
+$stmt->execute([$monthStart, $monthEnd, $monthStart, $monthEnd, $monthStart, $monthEnd, $monthStart, $monthEnd]);
 $monthSales = $stmt->fetch();
 
 $stmt = db()->prepare('SELECT COALESCE(SUM(amount),0) total FROM expenses WHERE expense_date BETWEEN ? AND ?');
@@ -49,9 +57,13 @@ for ($i = 6; $i >= 0; $i--) {
             SELECT total FROM sales WHERE sale_date = ?
             UNION ALL
             SELECT total FROM orders WHERE status = 'Completed' AND pickup_date = ?
+            UNION ALL
+            SELECT deposit_paid AS total FROM events WHERE deposit_paid > 0 AND deposit_date = ?
+            UNION ALL
+            SELECT balance_paid AS total FROM events WHERE balance_paid > 0 AND balance_paid_date = ?
         ) dashboard_sales
     ");
-    $stmt->execute([$date, $date]);
+    $stmt->execute([$date, $date, $date, $date]);
     $trendValues[] = (float) $stmt->fetchColumn();
 }
 
@@ -61,6 +73,10 @@ $categoryRows = db()->query("
         SELECT sale_type, total FROM sales
         UNION ALL
         SELECT 'Tempahan' AS sale_type, total FROM orders WHERE status = 'Completed'
+        UNION ALL
+        SELECT 'Event' AS sale_type, deposit_paid AS total FROM events WHERE deposit_paid > 0
+        UNION ALL
+        SELECT 'Event' AS sale_type, balance_paid AS total FROM events WHERE balance_paid > 0
     ) dashboard_sales
     GROUP BY sale_type
 ")->fetchAll();

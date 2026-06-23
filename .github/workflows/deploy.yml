@@ -28,6 +28,7 @@ jobs:
             .agents/**
             .codex/**
             config/config.php
+            migrations/**
             database.sql
             database_hosting.sql
             README.md

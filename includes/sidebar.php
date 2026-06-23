@@ -4,6 +4,7 @@ $items = [
     ['sales.php', 'bi-receipt', 'Sales'],
     ['expenses.php', 'bi-wallet2', 'Expenses'],
     ['orders.php', 'bi-bag-check', 'Tempahan'],
+    ['events.php', 'bi-calendar-event', 'Event'],
     ['reports.php', 'bi-bar-chart-line', 'Reports'],
     ['settings.php', 'bi-gear', 'Settings'],
 ];
@@ -36,4 +37,3 @@ $items = [
         </nav>
     </div>
 </div>
-

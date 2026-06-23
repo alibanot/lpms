@@ -1,0 +1,2 @@
+ALTER TABLE events
+    ADD COLUMN deposit_paid DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER price;
