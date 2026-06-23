@@ -2,6 +2,8 @@
 require_once __DIR__ . '/includes/init.php';
 require_login();
 
+$statuses = ['Pending', 'Complete'];
+
 if (is_post()) {
     verify_csrf();
     $action = $_POST['action'] ?? 'create';
@@ -17,6 +19,7 @@ if (is_post()) {
     $balancePaid = max(0, (float) ($_POST['balance_paid'] ?? 0));
     $depositDate = $depositPaid > 0 ? ($_POST['deposit_date'] ?: date('Y-m-d')) : null;
     $balancePaidDate = $balancePaid > 0 ? ($_POST['balance_paid_date'] ?: date('Y-m-d')) : null;
+    $status = in_array($_POST['status'] ?? '', $statuses, true) ? $_POST['status'] : 'Pending';
 
     $values = [
         $_POST['event_date'] ?? date('Y-m-d'),
@@ -27,16 +30,17 @@ if (is_post()) {
         $depositDate,
         $balancePaid,
         $balancePaidDate,
+        $status,
     ];
 
     if ($action === 'update') {
-        $stmt = db()->prepare('UPDATE events SET event_date = ?, event_place = ?, package_name = ?, price = ?, deposit_paid = ?, deposit_date = ?, balance_paid = ?, balance_paid_date = ? WHERE id = ?');
+        $stmt = db()->prepare('UPDATE events SET event_date = ?, event_place = ?, package_name = ?, price = ?, deposit_paid = ?, deposit_date = ?, balance_paid = ?, balance_paid_date = ?, status = ? WHERE id = ?');
         $stmt->execute([...$values, (int) ($_POST['id'] ?? 0)]);
         $_SESSION['flash_success'] = 'Catering updated.';
         redirect('events.php');
     }
 
-    $stmt = db()->prepare('INSERT INTO events (event_date, event_place, package_name, price, deposit_paid, deposit_date, balance_paid, balance_paid_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+    $stmt = db()->prepare('INSERT INTO events (event_date, event_place, package_name, price, deposit_paid, deposit_date, balance_paid, balance_paid_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
     $stmt->execute($values);
     $_SESSION['flash_success'] = 'Catering saved.';
     redirect('events.php');
@@ -62,7 +66,7 @@ include __DIR__ . '/includes/header.php';
     </div>
             <div class="table-responsive">
                 <table class="table table-striped align-middle datatable">
-                    <thead><tr><th>Catering Date</th><th>Place</th><th>Package</th><th>Price</th><th>Deposit</th><th>Balance Paid</th><th>Balance Remaining</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>Catering Date</th><th>Place</th><th>Package</th><th>Price</th><th>Deposit</th><th>Balance Paid</th><th>Balance Remaining</th><th>Status</th><th>Actions</th></tr></thead>
                     <tbody>
                     <?php foreach ($rows as $row): ?>
                         <tr>
@@ -73,6 +77,7 @@ include __DIR__ . '/includes/header.php';
                             <td><?= money($row['deposit_paid']) ?><div class="small text-muted"><?= h($row['deposit_date'] ?? '') ?></div></td>
                             <td><?= money($row['balance_paid']) ?><div class="small text-muted"><?= h($row['balance_paid_date'] ?? '') ?></div></td>
                             <td><?= money(max(0, (float) $row['price'] - (float) $row['deposit_paid'] - (float) $row['balance_paid'])) ?></td>
+                            <td><span class="badge <?= ($row['status'] ?? 'Pending') === 'Complete' ? 'text-bg-success' : 'text-bg-warning' ?>"><?= h($row['status'] ?? 'Pending') ?></span></td>
                             <td>
                                 <div class="d-flex gap-1">
                                     <a class="btn btn-sm btn-outline-primary" href="events.php?edit=<?= h((string) $row['id']) ?>">Edit</a>
@@ -134,6 +139,14 @@ include __DIR__ . '/includes/header.php';
                         <div class="col-12 col-md-6">
                             <label class="form-label">Balance Paid Date</label>
                             <input class="form-control" type="date" name="balance_paid_date" value="<?= h($editRow['balance_paid_date'] ?? '') ?>">
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="status" required>
+                                <?php foreach ($statuses as $status): ?>
+                                    <option value="<?= h($status) ?>" <?= (($editRow['status'] ?? 'Pending') === $status) ? 'selected' : '' ?>><?= h($status) ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="col-12">
                             <label class="form-label">Balance Remaining</label>
