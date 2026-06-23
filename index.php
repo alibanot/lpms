@@ -5,25 +5,10 @@ require_login();
 $today = date('Y-m-d');
 $monthStart = date('Y-m-01');
 $monthEnd = date('Y-m-t');
-
-$stmt = db()->prepare("
-    SELECT COALESCE(SUM(total),0) total, COALESCE(SUM(qty),0) qty
-    FROM (
-        SELECT total, qty FROM sales WHERE sale_type = 'Gerai' AND sale_date = ?
-        UNION ALL
-        SELECT total, qty FROM orders WHERE status = 'Completed' AND pickup_date = ?
-        UNION ALL
-        SELECT deposit_paid AS total, 0 AS qty FROM events WHERE deposit_paid > 0 AND deposit_date = ?
-        UNION ALL
-        SELECT balance_paid AS total, 0 AS qty FROM events WHERE balance_paid > 0 AND balance_paid_date = ?
-    ) dashboard_sales
-");
-$stmt->execute([$today, $today, $today, $today]);
-$todaySales = $stmt->fetch();
-
-$stmt = db()->prepare('SELECT COALESCE(SUM(amount),0) total FROM expenses WHERE expense_date = ?');
-$stmt->execute([$today]);
-$todayExpenses = $stmt->fetchColumn();
+$period = ($_GET['period'] ?? 'today') === 'month' ? 'month' : 'today';
+$periodStart = $period === 'month' ? $monthStart : $today;
+$periodEnd = $period === 'month' ? $monthEnd : $today;
+$periodLabel = $period === 'month' ? 'This Month' : 'Today';
 
 $stmt = db()->prepare("
     SELECT COALESCE(SUM(total),0) total, COALESCE(SUM(qty),0) qty
@@ -37,14 +22,16 @@ $stmt = db()->prepare("
         SELECT balance_paid AS total, 0 AS qty FROM events WHERE balance_paid > 0 AND balance_paid_date BETWEEN ? AND ?
     ) dashboard_sales
 ");
-$stmt->execute([$monthStart, $monthEnd, $monthStart, $monthEnd, $monthStart, $monthEnd, $monthStart, $monthEnd]);
-$monthSales = $stmt->fetch();
+$stmt->execute([$periodStart, $periodEnd, $periodStart, $periodEnd, $periodStart, $periodEnd, $periodStart, $periodEnd]);
+$periodSales = $stmt->fetch();
 
 $stmt = db()->prepare('SELECT COALESCE(SUM(amount),0) total FROM expenses WHERE expense_date BETWEEN ? AND ?');
-$stmt->execute([$monthStart, $monthEnd]);
-$monthExpenses = $stmt->fetchColumn();
+$stmt->execute([$periodStart, $periodEnd]);
+$periodExpenses = $stmt->fetchColumn();
 
-$pendingOrders = (int) db()->query("SELECT COUNT(*) FROM orders WHERE status = 'Pending'")->fetchColumn();
+$stmt = db()->prepare('SELECT event_date, event_place FROM events WHERE event_date >= ? ORDER BY event_date ASC, id ASC LIMIT 1');
+$stmt->execute([$today]);
+$nextCatering = $stmt->fetch();
 
 $trendLabels = [];
 $trendValues = [];
@@ -67,37 +54,43 @@ for ($i = 6; $i >= 0; $i--) {
     $trendValues[] = (float) $stmt->fetchColumn();
 }
 
-$categoryRows = db()->query("
+$stmt = db()->prepare("
     SELECT sale_type, COALESCE(SUM(total),0) total
     FROM (
-        SELECT 'Gerai' AS sale_type, total FROM sales WHERE sale_type = 'Gerai'
+        SELECT 'Gerai' AS sale_type, total FROM sales WHERE sale_type = 'Gerai' AND sale_date BETWEEN ? AND ?
         UNION ALL
-        SELECT COALESCE(order_type, 'Tempahan') AS sale_type, total FROM orders WHERE status = 'Completed'
+        SELECT COALESCE(order_type, 'Tempahan') AS sale_type, total FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
         UNION ALL
-        SELECT 'Catering' AS sale_type, deposit_paid AS total FROM events WHERE deposit_paid > 0
+        SELECT 'Catering' AS sale_type, deposit_paid AS total FROM events WHERE deposit_paid > 0 AND deposit_date BETWEEN ? AND ?
         UNION ALL
-        SELECT 'Catering' AS sale_type, balance_paid AS total FROM events WHERE balance_paid > 0
+        SELECT 'Catering' AS sale_type, balance_paid AS total FROM events WHERE balance_paid > 0 AND balance_paid_date BETWEEN ? AND ?
     ) dashboard_sales
     GROUP BY sale_type
-")->fetchAll();
+");
+$stmt->execute([$periodStart, $periodEnd, $periodStart, $periodEnd, $periodStart, $periodEnd, $periodStart, $periodEnd]);
+$categoryRows = $stmt->fetchAll();
 $categoryLabels = array_column($categoryRows, 'sale_type');
 $categoryValues = array_map('floatval', array_column($categoryRows, 'total'));
 
 $metrics = [
-    ['Today\'s Sales', money($todaySales['total']), 'bi-cash-stack', 'bg-success-subtle text-success'],
-    ['Today\'s Expenses', money($todayExpenses), 'bi-wallet2', 'bg-danger-subtle text-danger'],
-    ['Today\'s Profit', money((float) $todaySales['total'] - (float) $todayExpenses), 'bi-graph-up-arrow', 'bg-primary-subtle text-primary'],
-    ['Monthly Sales', money($monthSales['total']), 'bi-calendar-check', 'bg-info-subtle text-info'],
-    ['Monthly Expenses', money($monthExpenses), 'bi-calendar-minus', 'bg-warning-subtle text-warning'],
-    ['Monthly Profit', money((float) $monthSales['total'] - (float) $monthExpenses), 'bi-trophy', 'bg-success-subtle text-success'],
-    ['Pieces Sold Today', number_plain($todaySales['qty']), 'bi-box-seam', 'bg-secondary-subtle text-secondary'],
-    ['Pieces Sold This Month', number_plain($monthSales['qty']), 'bi-boxes', 'bg-primary-subtle text-primary'],
-    ['Pending Orders', (string) $pendingOrders, 'bi-hourglass-split', 'bg-warning-subtle text-warning'],
+    ['Sales', money($periodSales['total']), 'bi-cash-stack', 'bg-success-subtle text-success'],
+    ['Pieces', number_plain($periodSales['qty']), 'bi-box-seam', 'bg-primary-subtle text-primary'],
+    ['Expenses', money($periodExpenses), 'bi-wallet2', 'bg-danger-subtle text-danger'],
 ];
 
 $pageTitle = 'Dashboard';
 include __DIR__ . '/includes/header.php';
 ?>
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+    <div>
+        <h1 class="h5 mb-1">Dashboard</h1>
+        <div class="text-muted small"><?= h($periodLabel) ?> summary</div>
+    </div>
+    <div class="btn-group no-print" role="group" aria-label="Dashboard period">
+        <a class="btn btn-sm <?= $period === 'today' ? 'btn-primary' : 'btn-outline-primary' ?>" href="index.php?period=today">Today</a>
+        <a class="btn btn-sm <?= $period === 'month' ? 'btn-primary' : 'btn-outline-primary' ?>" href="index.php?period=month">This Month</a>
+    </div>
+</div>
 <div class="row g-3 mb-4">
     <?php foreach ($metrics as [$label, $value, $icon, $tone]): ?>
         <div class="col-12 col-sm-6 col-xl-4">
@@ -112,6 +105,21 @@ include __DIR__ . '/includes/header.php';
             </div>
         </div>
     <?php endforeach; ?>
+    <div class="col-12">
+        <div class="card metric-card">
+            <div class="card-body d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                <div>
+                    <div class="text-muted small">Next Catering Reminder</div>
+                    <?php if ($nextCatering): ?>
+                        <div class="h5 mb-1"><?= h(date('d/m/Y', strtotime($nextCatering['event_date']))) ?> - <?= h($nextCatering['event_place']) ?></div>
+                    <?php else: ?>
+                        <div class="h5 mb-0">No upcoming catering</div>
+                    <?php endif; ?>
+                </div>
+                <span class="icon bg-info-subtle text-info"><i class="bi bi-calendar-event"></i></span>
+            </div>
+        </div>
+    </div>
 </div>
 <div class="row g-3">
     <div class="col-12 col-xl-8">
