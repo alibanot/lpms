@@ -1,0 +1,160 @@
+:root {
+    --sidebar-width: 260px;
+    --brand: #0f766e;
+    --ink: #172026;
+    --muted: #667085;
+    --surface: #f6f8fb;
+}
+
+body {
+    background: var(--surface);
+    color: var(--ink);
+}
+
+.app-shell {
+    min-height: 100vh;
+}
+
+.sidebar {
+    background: #102a43;
+    color: #fff;
+    flex-direction: column;
+    inset: 0 auto 0 0;
+    padding: 1rem;
+    position: fixed;
+    width: var(--sidebar-width);
+}
+
+.brand {
+    align-items: center;
+    display: flex;
+    font-size: 1.1rem;
+    font-weight: 700;
+    gap: .75rem;
+    margin-bottom: 1.5rem;
+}
+
+.brand-mark {
+    align-items: center;
+    background: #14b8a6;
+    border-radius: 8px;
+    color: #092635;
+    display: inline-flex;
+    height: 40px;
+    justify-content: center;
+    width: 40px;
+}
+
+.sidebar .nav-link,
+.mobile-nav .nav-link {
+    align-items: center;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, .82);
+    display: flex;
+    gap: .75rem;
+    min-height: 44px;
+    padding: .65rem .75rem;
+}
+
+.mobile-nav .nav-link {
+    color: #243b53;
+}
+
+.sidebar .nav-link:hover,
+.sidebar .nav-link.active {
+    background: rgba(20, 184, 166, .18);
+    color: #fff;
+}
+
+.mobile-nav .nav-link.active {
+    background: #e6fffb;
+    color: var(--brand);
+}
+
+.app-main {
+    margin-left: var(--sidebar-width);
+    min-height: 100vh;
+}
+
+.metric-card {
+    border: 0;
+    border-radius: 8px;
+    box-shadow: 0 8px 28px rgba(16, 42, 67, .07);
+}
+
+.metric-card .icon {
+    align-items: center;
+    border-radius: 8px;
+    display: inline-flex;
+    height: 42px;
+    justify-content: center;
+    width: 42px;
+}
+
+.form-card,
+.table-card,
+.chart-panel {
+    background: #fff;
+    border: 1px solid #e4e7ec;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.chart-panel {
+    min-height: 340px;
+}
+
+.chart-panel canvas {
+    max-height: 280px;
+}
+
+.login-page {
+    align-items: center;
+    background: linear-gradient(135deg, #f0fdfa 0%, #eef2ff 100%);
+    display: flex;
+    min-height: 100vh;
+}
+
+.login-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 20px 60px rgba(16, 42, 67, .14);
+    margin: auto;
+    max-width: 420px;
+    padding: 2rem;
+    width: min(92vw, 420px);
+}
+
+.badge-status {
+    min-width: 86px;
+}
+
+@media (max-width: 991.98px) {
+    .app-main {
+        margin-left: 0;
+    }
+}
+
+@media print {
+    .sidebar,
+    .navbar,
+    .no-print,
+    .dataTables_filter,
+    .dataTables_length,
+    .dataTables_paginate,
+    .dataTables_info {
+        display: none !important;
+    }
+
+    .app-main {
+        margin-left: 0;
+    }
+
+    .form-card,
+    .table-card,
+    .chart-panel {
+        border: 0;
+        padding: 0;
+    }
+}
+

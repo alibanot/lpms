@@ -1,0 +1,6 @@
+config/config.php
+database.sql
+database_hosting.sql
+.agents/
+.codex/
+.ftp-deploy-sync-state.json
