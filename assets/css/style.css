@@ -135,6 +135,18 @@ body {
     }
 }
 
+@media (min-width: 992px) {
+    .offcanvas-backdrop {
+        display: none !important;
+        pointer-events: none !important;
+    }
+
+    body {
+        overflow: auto !important;
+        padding-right: 0 !important;
+    }
+}
+
 @media print {
     .sidebar,
     .navbar,
@@ -157,4 +169,3 @@ body {
         padding: 0;
     }
 }
-

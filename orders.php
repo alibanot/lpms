@@ -6,7 +6,16 @@ $statuses = ['Pending', 'Ready', 'Completed', 'Cancelled'];
 
 if (is_post()) {
     verify_csrf();
-    if (($_POST['action'] ?? '') === 'status') {
+    $action = $_POST['action'] ?? 'create';
+
+    if ($action === 'delete') {
+        $stmt = db()->prepare('DELETE FROM orders WHERE id = ?');
+        $stmt->execute([(int) ($_POST['id'] ?? 0)]);
+        $_SESSION['flash_success'] = 'Order deleted.';
+        redirect('orders.php');
+    }
+
+    if ($action === 'status') {
         $status = in_array($_POST['status'] ?? '', $statuses, true) ? $_POST['status'] : 'Pending';
         $stmt = db()->prepare('UPDATE orders SET status = ? WHERE id = ?');
         $stmt->execute([$status, (int) ($_POST['id'] ?? 0)]);
@@ -17,8 +26,7 @@ if (is_post()) {
     $qty = max(0, (int) ($_POST['qty'] ?? 0));
     $unitPrice = max(0, (float) ($_POST['unit_price'] ?? 0));
     $status = in_array($_POST['status'] ?? '', $statuses, true) ? $_POST['status'] : 'Pending';
-    $stmt = db()->prepare('INSERT INTO orders (customer_name, phone, pickup_date, qty, unit_price, total, status, remarks) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-    $stmt->execute([
+    $values = [
         trim($_POST['customer_name'] ?? ''),
         trim($_POST['phone'] ?? ''),
         $_POST['pickup_date'] ?? date('Y-m-d'),
@@ -27,9 +35,26 @@ if (is_post()) {
         $qty * $unitPrice,
         $status,
         trim($_POST['remarks'] ?? ''),
-    ]);
+    ];
+
+    if ($action === 'update') {
+        $stmt = db()->prepare('UPDATE orders SET customer_name = ?, phone = ?, pickup_date = ?, qty = ?, unit_price = ?, total = ?, status = ?, remarks = ? WHERE id = ?');
+        $stmt->execute([...$values, (int) ($_POST['id'] ?? 0)]);
+        $_SESSION['flash_success'] = 'Order updated.';
+        redirect('orders.php');
+    }
+
+    $stmt = db()->prepare('INSERT INTO orders (customer_name, phone, pickup_date, qty, unit_price, total, status, remarks) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+    $stmt->execute($values);
     $_SESSION['flash_success'] = 'Order saved.';
     redirect('orders.php');
+}
+
+$editRow = null;
+if (isset($_GET['edit'])) {
+    $stmt = db()->prepare('SELECT * FROM orders WHERE id = ? LIMIT 1');
+    $stmt->execute([(int) $_GET['edit']]);
+    $editRow = $stmt->fetch() ?: null;
 }
 
 $filterStatus = $_GET['status'] ?? '';
@@ -47,29 +72,31 @@ include __DIR__ . '/includes/header.php';
 <div class="row g-3">
     <div class="col-12 col-xl-4">
         <div class="form-card">
-            <h1 class="h5 mb-3">Add Order</h1>
+            <h1 class="h5 mb-3"><?= $editRow ? 'Edit Order' : 'Add Order' ?></h1>
             <form method="post" data-calc-total>
                 <?= csrf_field() ?>
+                <input type="hidden" name="action" value="<?= $editRow ? 'update' : 'create' ?>">
+                <?php if ($editRow): ?><input type="hidden" name="id" value="<?= h((string) $editRow['id']) ?>"><?php endif; ?>
                 <div class="mb-3">
                     <label class="form-label">Customer Name</label>
-                    <input class="form-control" name="customer_name" required>
+                    <input class="form-control" name="customer_name" value="<?= h($editRow['customer_name'] ?? '') ?>" required>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Phone Number</label>
-                    <input class="form-control" name="phone" inputmode="tel" required>
+                    <input class="form-control" name="phone" inputmode="tel" value="<?= h($editRow['phone'] ?? '') ?>" required>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Pickup Date</label>
-                    <input class="form-control" type="date" name="pickup_date" value="<?= h(date('Y-m-d')) ?>" required>
+                    <input class="form-control" type="date" name="pickup_date" value="<?= h($editRow['pickup_date'] ?? date('Y-m-d')) ?>" required>
                 </div>
                 <div class="row g-2">
                     <div class="col-6 mb-3">
                         <label class="form-label">Quantity</label>
-                        <input class="form-control" type="number" name="qty" min="1" value="1" data-qty required>
+                        <input class="form-control" type="number" name="qty" min="1" value="<?= h((string) ($editRow['qty'] ?? 1)) ?>" data-qty required>
                     </div>
                     <div class="col-6 mb-3">
                         <label class="form-label">Unit Price</label>
-                        <input class="form-control" type="number" name="unit_price" min="0" step="0.01" value="<?= h((string) current_default_price()) ?>" data-unit-price required>
+                        <input class="form-control" type="number" name="unit_price" min="0" step="0.01" value="<?= h((string) ($editRow['unit_price'] ?? current_default_price())) ?>" data-unit-price required>
                     </div>
                 </div>
                 <div class="mb-3">
@@ -79,14 +106,17 @@ include __DIR__ . '/includes/header.php';
                 <div class="mb-3">
                     <label class="form-label">Status</label>
                     <select class="form-select" name="status">
-                        <?php foreach ($statuses as $status): ?><option><?= h($status) ?></option><?php endforeach; ?>
+                        <?php foreach ($statuses as $status): ?>
+                            <option value="<?= h($status) ?>" <?= (($editRow['status'] ?? '') === $status) ? 'selected' : '' ?>><?= h($status) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Remarks</label>
-                    <textarea class="form-control" name="remarks" rows="3"></textarea>
+                    <textarea class="form-control" name="remarks" rows="3"><?= h($editRow['remarks'] ?? '') ?></textarea>
                 </div>
-                <button class="btn btn-primary w-100" type="submit">Save Order</button>
+                <button class="btn btn-primary w-100" type="submit"><?= $editRow ? 'Update Order' : 'Save Order' ?></button>
+                <?php if ($editRow): ?><a class="btn btn-outline-secondary w-100 mt-2" href="orders.php">Cancel Edit</a><?php endif; ?>
             </form>
         </div>
     </div>
@@ -106,7 +136,7 @@ include __DIR__ . '/includes/header.php';
             </div>
             <div class="table-responsive">
                 <table class="table table-striped align-middle datatable">
-                    <thead><tr><th>Customer</th><th>Phone</th><th>Pickup</th><th>Qty</th><th>Total</th><th>Status</th><th>Remarks</th></tr></thead>
+                    <thead><tr><th>Customer</th><th>Phone</th><th>Pickup</th><th>Qty</th><th>Total</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead>
                     <tbody>
                     <?php foreach ($rows as $row): ?>
                         <tr>
@@ -128,6 +158,17 @@ include __DIR__ . '/includes/header.php';
                                 </form>
                             </td>
                             <td><?= h($row['remarks']) ?></td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    <a class="btn btn-sm btn-outline-primary" href="orders.php?edit=<?= h((string) $row['id']) ?>">Edit</a>
+                                    <form method="post" onsubmit="return confirm('Delete this order?')">
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="id" value="<?= h((string) $row['id']) ?>">
+                                        <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                                    </form>
+                                </div>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
@@ -137,4 +178,3 @@ include __DIR__ . '/includes/header.php';
     </div>
 </div>
 <?php include __DIR__ . '/includes/footer.php'; ?>
-

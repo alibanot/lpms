@@ -1,4 +1,41 @@
 $(function () {
+    const cleanupBackdrops = function () {
+        const hasOpenOverlay = $('.offcanvas.show, .modal.show').length > 0;
+        if (!hasOpenOverlay) {
+            $('.offcanvas-backdrop, .modal-backdrop').remove();
+            $('body').removeClass('modal-open offcanvas-backdrop').css({
+                overflow: '',
+                paddingRight: '',
+            });
+        }
+    };
+
+    const closeDesktopOffcanvas = function () {
+        if (!window.matchMedia('(min-width: 992px)').matches) {
+            return;
+        }
+
+        const sidebar = document.getElementById('mobileSidebar');
+        if (!sidebar || !window.bootstrap) {
+            cleanupBackdrops();
+            return;
+        }
+
+        const instance = bootstrap.Offcanvas.getInstance(sidebar);
+        if (instance) {
+            instance.hide();
+        }
+
+        sidebar.classList.remove('show');
+        cleanupBackdrops();
+    };
+
+    window.addEventListener('pageshow', cleanupBackdrops);
+    window.addEventListener('resize', closeDesktopOffcanvas);
+    document.addEventListener('hidden.bs.offcanvas', cleanupBackdrops);
+
+    closeDesktopOffcanvas();
+
     $('.datatable').DataTable({
         responsive: true,
         pageLength: 10,
@@ -16,4 +53,3 @@ $(function () {
         update();
     });
 });
-
