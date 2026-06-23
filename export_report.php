@@ -8,13 +8,13 @@ $filter = $_GET['filter'] ?? 'today';
 $stmt = db()->prepare("
     SELECT sale_type, COALESCE(SUM(qty),0) qty, COALESCE(SUM(total),0) total
     FROM (
-        SELECT sale_type, qty, total FROM sales WHERE sale_date BETWEEN ? AND ?
+        SELECT 'Gerai' AS sale_type, qty, total FROM sales WHERE sale_type = 'Gerai' AND sale_date BETWEEN ? AND ?
         UNION ALL
-        SELECT 'Tempahan' AS sale_type, qty, total FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
+        SELECT COALESCE(order_type, 'Tempahan') AS sale_type, qty, total FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
         UNION ALL
-        SELECT 'Event' AS sale_type, 0 AS qty, deposit_paid AS total FROM events WHERE deposit_paid > 0 AND deposit_date BETWEEN ? AND ?
+        SELECT 'Catering' AS sale_type, 0 AS qty, deposit_paid AS total FROM events WHERE deposit_paid > 0 AND deposit_date BETWEEN ? AND ?
         UNION ALL
-        SELECT 'Event' AS sale_type, 0 AS qty, balance_paid AS total FROM events WHERE balance_paid > 0 AND balance_paid_date BETWEEN ? AND ?
+        SELECT 'Catering' AS sale_type, 0 AS qty, balance_paid AS total FROM events WHERE balance_paid > 0 AND balance_paid_date BETWEEN ? AND ?
     ) report_sales
     GROUP BY sale_type
 ");
@@ -24,7 +24,7 @@ $rows = $stmt->fetchAll();
 $stmt = db()->prepare("
     SELECT COALESCE(SUM(total),0), COALESCE(SUM(qty),0)
     FROM (
-        SELECT total, qty FROM sales WHERE sale_date BETWEEN ? AND ?
+        SELECT total, qty FROM sales WHERE sale_type = 'Gerai' AND sale_date BETWEEN ? AND ?
         UNION ALL
         SELECT total, qty FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
         UNION ALL

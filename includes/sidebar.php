@@ -1,10 +1,10 @@
 <?php
 $items = [
     ['index.php', 'bi-speedometer2', 'Dashboard'],
-    ['sales.php', 'bi-receipt', 'Sales'],
+    ['sales.php', 'bi-receipt', 'Daily Sales'],
     ['expenses.php', 'bi-wallet2', 'Expenses'],
     ['orders.php', 'bi-bag-check', 'Tempahan'],
-    ['events.php', 'bi-calendar-event', 'Event'],
+    ['events.php', 'bi-calendar-event', 'Catering'],
     ['reports.php', 'bi-bar-chart-line', 'Reports'],
     ['settings.php', 'bi-gear', 'Settings'],
 ];

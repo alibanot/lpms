@@ -64,4 +64,8 @@ $(function () {
         $scope.on('input', '[data-event-price], [data-event-deposit], [data-event-balance-paid]', update);
         update();
     });
+
+    $('[data-report-date]').on('change', function () {
+        $('#reportFilter').val('custom');
+    });
 });

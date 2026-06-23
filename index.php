@@ -9,7 +9,7 @@ $monthEnd = date('Y-m-t');
 $stmt = db()->prepare("
     SELECT COALESCE(SUM(total),0) total, COALESCE(SUM(qty),0) qty
     FROM (
-        SELECT total, qty FROM sales WHERE sale_date = ?
+        SELECT total, qty FROM sales WHERE sale_type = 'Gerai' AND sale_date = ?
         UNION ALL
         SELECT total, qty FROM orders WHERE status = 'Completed' AND pickup_date = ?
         UNION ALL
@@ -28,7 +28,7 @@ $todayExpenses = $stmt->fetchColumn();
 $stmt = db()->prepare("
     SELECT COALESCE(SUM(total),0) total, COALESCE(SUM(qty),0) qty
     FROM (
-        SELECT total, qty FROM sales WHERE sale_date BETWEEN ? AND ?
+        SELECT total, qty FROM sales WHERE sale_type = 'Gerai' AND sale_date BETWEEN ? AND ?
         UNION ALL
         SELECT total, qty FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
         UNION ALL
@@ -54,7 +54,7 @@ for ($i = 6; $i >= 0; $i--) {
     $stmt = db()->prepare("
         SELECT COALESCE(SUM(total),0)
         FROM (
-            SELECT total FROM sales WHERE sale_date = ?
+            SELECT total FROM sales WHERE sale_type = 'Gerai' AND sale_date = ?
             UNION ALL
             SELECT total FROM orders WHERE status = 'Completed' AND pickup_date = ?
             UNION ALL
@@ -70,13 +70,13 @@ for ($i = 6; $i >= 0; $i--) {
 $categoryRows = db()->query("
     SELECT sale_type, COALESCE(SUM(total),0) total
     FROM (
-        SELECT sale_type, total FROM sales
+        SELECT 'Gerai' AS sale_type, total FROM sales WHERE sale_type = 'Gerai'
         UNION ALL
-        SELECT 'Tempahan' AS sale_type, total FROM orders WHERE status = 'Completed'
+        SELECT COALESCE(order_type, 'Tempahan') AS sale_type, total FROM orders WHERE status = 'Completed'
         UNION ALL
-        SELECT 'Event' AS sale_type, deposit_paid AS total FROM events WHERE deposit_paid > 0
+        SELECT 'Catering' AS sale_type, deposit_paid AS total FROM events WHERE deposit_paid > 0
         UNION ALL
-        SELECT 'Event' AS sale_type, balance_paid AS total FROM events WHERE balance_paid > 0
+        SELECT 'Catering' AS sale_type, balance_paid AS total FROM events WHERE balance_paid > 0
     ) dashboard_sales
     GROUP BY sale_type
 ")->fetchAll();

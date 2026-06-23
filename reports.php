@@ -8,7 +8,7 @@ $filter = $_GET['filter'] ?? 'today';
 $stmt = db()->prepare("
     SELECT COALESCE(SUM(total),0) total, COALESCE(SUM(qty),0) qty
     FROM (
-        SELECT total, qty FROM sales WHERE sale_date BETWEEN ? AND ?
+        SELECT total, qty FROM sales WHERE sale_type = 'Gerai' AND sale_date BETWEEN ? AND ?
         UNION ALL
         SELECT total, qty FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
         UNION ALL
@@ -27,13 +27,13 @@ $expensesTotal = (float) $stmt->fetchColumn();
 $stmt = db()->prepare("
     SELECT sale_type, COALESCE(SUM(total),0) total, COALESCE(SUM(qty),0) qty
     FROM (
-        SELECT sale_type, total, qty FROM sales WHERE sale_date BETWEEN ? AND ?
+        SELECT 'Gerai' AS sale_type, total, qty FROM sales WHERE sale_type = 'Gerai' AND sale_date BETWEEN ? AND ?
         UNION ALL
-        SELECT 'Tempahan' AS sale_type, total, qty FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
+        SELECT COALESCE(order_type, 'Tempahan') AS sale_type, total, qty FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
         UNION ALL
-        SELECT 'Event' AS sale_type, deposit_paid AS total, 0 AS qty FROM events WHERE deposit_paid > 0 AND deposit_date BETWEEN ? AND ?
+        SELECT 'Catering' AS sale_type, deposit_paid AS total, 0 AS qty FROM events WHERE deposit_paid > 0 AND deposit_date BETWEEN ? AND ?
         UNION ALL
-        SELECT 'Event' AS sale_type, balance_paid AS total, 0 AS qty FROM events WHERE balance_paid > 0 AND balance_paid_date BETWEEN ? AND ?
+        SELECT 'Catering' AS sale_type, balance_paid AS total, 0 AS qty FROM events WHERE balance_paid > 0 AND balance_paid_date BETWEEN ? AND ?
     ) report_sales
     GROUP BY sale_type
 ");
@@ -45,7 +45,7 @@ foreach ($breakdowns as $row) {
     $breakdownMap[$row['sale_type']] = $row;
 }
 
-$saleTypes = ['Gerai', 'Tempahan', 'Frozen', 'Catering', 'Event'];
+$saleTypes = ['Gerai', 'Tempahan', 'Frozen', 'Catering'];
 $query = http_build_query(['filter' => $filter, 'start_date' => $startDate, 'end_date' => $endDate]);
 
 $pageTitle = 'Reports';
@@ -63,11 +63,11 @@ include __DIR__ . '/includes/header.php';
         </div>
         <div class="col-6 col-md-3">
             <label class="form-label">Start Date</label>
-            <input class="form-control" type="date" name="start_date" value="<?= h($startDate) ?>">
+            <input class="form-control" type="date" name="start_date" value="<?= h($startDate) ?>" data-report-date>
         </div>
         <div class="col-6 col-md-3">
             <label class="form-label">End Date</label>
-            <input class="form-control" type="date" name="end_date" value="<?= h($endDate) ?>">
+            <input class="form-control" type="date" name="end_date" value="<?= h($endDate) ?>" data-report-date>
         </div>
         <div class="col-12 col-md-3 d-flex gap-2">
             <button class="btn btn-primary flex-fill" type="submit">Apply</button>

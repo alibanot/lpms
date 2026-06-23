@@ -3,6 +3,7 @@ require_once __DIR__ . '/includes/init.php';
 require_login();
 
 $statuses = ['Pending', 'Ready', 'Completed', 'Cancelled'];
+$orderTypes = ['Tempahan', 'Frozen'];
 
 if (is_post()) {
     verify_csrf();
@@ -26,9 +27,11 @@ if (is_post()) {
     $qty = max(0, (int) ($_POST['qty'] ?? 0));
     $unitPrice = max(0, (float) ($_POST['unit_price'] ?? 0));
     $status = in_array($_POST['status'] ?? '', $statuses, true) ? $_POST['status'] : 'Pending';
+    $orderType = in_array($_POST['order_type'] ?? '', $orderTypes, true) ? $_POST['order_type'] : 'Tempahan';
     $values = [
         trim($_POST['customer_name'] ?? ''),
         trim($_POST['phone'] ?? ''),
+        $orderType,
         $_POST['pickup_date'] ?? date('Y-m-d'),
         $qty,
         $unitPrice,
@@ -38,13 +41,13 @@ if (is_post()) {
     ];
 
     if ($action === 'update') {
-        $stmt = db()->prepare('UPDATE orders SET customer_name = ?, phone = ?, pickup_date = ?, qty = ?, unit_price = ?, total = ?, status = ?, remarks = ? WHERE id = ?');
+        $stmt = db()->prepare('UPDATE orders SET customer_name = ?, phone = ?, order_type = ?, pickup_date = ?, qty = ?, unit_price = ?, total = ?, status = ?, remarks = ? WHERE id = ?');
         $stmt->execute([...$values, (int) ($_POST['id'] ?? 0)]);
         $_SESSION['flash_success'] = 'Order updated.';
         redirect('orders.php');
     }
 
-    $stmt = db()->prepare('INSERT INTO orders (customer_name, phone, pickup_date, qty, unit_price, total, status, remarks) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+    $stmt = db()->prepare('INSERT INTO orders (customer_name, phone, order_type, pickup_date, qty, unit_price, total, status, remarks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
     $stmt->execute($values);
     $_SESSION['flash_success'] = 'Order saved.';
     redirect('orders.php');
@@ -84,6 +87,14 @@ include __DIR__ . '/includes/header.php';
                 <div class="mb-3">
                     <label class="form-label">Phone Number</label>
                     <input class="form-control" name="phone" inputmode="tel" value="<?= h($editRow['phone'] ?? '') ?>" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Type</label>
+                    <select class="form-select" name="order_type" required>
+                        <?php foreach ($orderTypes as $type): ?>
+                            <option value="<?= h($type) ?>" <?= (($editRow['order_type'] ?? 'Tempahan') === $type) ? 'selected' : '' ?>><?= h($type) ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Pickup Date</label>
@@ -136,12 +147,13 @@ include __DIR__ . '/includes/header.php';
             </div>
             <div class="table-responsive">
                 <table class="table table-striped align-middle datatable">
-                    <thead><tr><th>Customer</th><th>Phone</th><th>Pickup</th><th>Qty</th><th>Total</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>Customer</th><th>Phone</th><th>Type</th><th>Pickup</th><th>Qty</th><th>Total</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead>
                     <tbody>
                     <?php foreach ($rows as $row): ?>
                         <tr>
                             <td><?= h($row['customer_name']) ?></td>
                             <td><?= h($row['phone']) ?></td>
+                            <td><?= h($row['order_type'] ?? 'Tempahan') ?></td>
                             <td><?= h($row['pickup_date']) ?></td>
                             <td><?= number_plain($row['qty']) ?></td>
                             <td><?= money($row['total']) ?></td>

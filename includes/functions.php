@@ -77,11 +77,17 @@ function report_date_range(string $filter, ?string $start = null, ?string $end =
 {
     $today = new DateTimeImmutable('today');
 
-    return match ($filter) {
+    $range = match ($filter) {
         'yesterday' => [$today->modify('-1 day')->format('Y-m-d'), $today->modify('-1 day')->format('Y-m-d')],
         'this_week' => [$today->modify('monday this week')->format('Y-m-d'), $today->modify('sunday this week')->format('Y-m-d')],
         'this_month' => [$today->format('Y-m-01'), $today->format('Y-m-t')],
         'custom' => [$start ?: $today->format('Y-m-d'), $end ?: $today->format('Y-m-d')],
         default => [$today->format('Y-m-d'), $today->format('Y-m-d')],
     };
+
+    if ($filter !== 'custom' && $start && $end && ($start !== $range[0] || $end !== $range[1])) {
+        return [$start, $end];
+    }
+
+    return $range;
 }
