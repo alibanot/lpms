@@ -9,6 +9,7 @@ $period = ($_GET['period'] ?? 'today') === 'month' ? 'month' : 'today';
 $periodStart = $period === 'month' ? $monthStart : $today;
 $periodEnd = $period === 'month' ? $monthEnd : $today;
 $periodLabel = $period === 'month' ? 'This Month' : 'Today';
+$trendType = ($_GET['trend'] ?? 'gerai') === 'all' ? 'all' : 'gerai';
 
 $stmt = db()->prepare("
     SELECT COALESCE(SUM(total),0) total, COALESCE(SUM(qty),0) qty
@@ -38,19 +39,24 @@ $trendValues = [];
 for ($i = 6; $i >= 0; $i--) {
     $date = date('Y-m-d', strtotime("-{$i} days"));
     $trendLabels[] = date('d M', strtotime($date));
-    $stmt = db()->prepare("
-        SELECT COALESCE(SUM(total),0)
-        FROM (
-            SELECT total FROM sales WHERE sale_type = 'Gerai' AND sale_date = ?
-            UNION ALL
-            SELECT total FROM orders WHERE status = 'Completed' AND pickup_date = ?
-            UNION ALL
-            SELECT deposit_paid AS total FROM events WHERE deposit_paid > 0 AND deposit_date = ?
-            UNION ALL
-            SELECT balance_paid AS total FROM events WHERE balance_paid > 0 AND balance_paid_date = ?
-        ) dashboard_sales
-    ");
-    $stmt->execute([$date, $date, $date, $date]);
+    if ($trendType === 'gerai') {
+        $stmt = db()->prepare("SELECT COALESCE(SUM(total),0) FROM sales WHERE sale_type = 'Gerai' AND sale_date = ?");
+        $stmt->execute([$date]);
+    } else {
+        $stmt = db()->prepare("
+            SELECT COALESCE(SUM(total),0)
+            FROM (
+                SELECT total FROM sales WHERE sale_type = 'Gerai' AND sale_date = ?
+                UNION ALL
+                SELECT total FROM orders WHERE status = 'Completed' AND pickup_date = ?
+                UNION ALL
+                SELECT deposit_paid AS total FROM events WHERE deposit_paid > 0 AND deposit_date = ?
+                UNION ALL
+                SELECT balance_paid AS total FROM events WHERE balance_paid > 0 AND balance_paid_date = ?
+            ) dashboard_sales
+        ");
+        $stmt->execute([$date, $date, $date, $date]);
+    }
     $trendValues[] = (float) $stmt->fetchColumn();
 }
 
@@ -87,8 +93,8 @@ include __DIR__ . '/includes/header.php';
         <div class="text-muted small"><?= h($periodLabel) ?> summary</div>
     </div>
     <div class="btn-group no-print" role="group" aria-label="Dashboard period">
-        <a class="btn btn-sm <?= $period === 'today' ? 'btn-primary' : 'btn-outline-primary' ?>" href="index.php?period=today">Today</a>
-        <a class="btn btn-sm <?= $period === 'month' ? 'btn-primary' : 'btn-outline-primary' ?>" href="index.php?period=month">This Month</a>
+        <a class="btn btn-sm <?= $period === 'today' ? 'btn-primary' : 'btn-outline-primary' ?>" href="index.php?period=today&trend=<?= h($trendType) ?>">Today</a>
+        <a class="btn btn-sm <?= $period === 'month' ? 'btn-primary' : 'btn-outline-primary' ?>" href="index.php?period=month&trend=<?= h($trendType) ?>">This Month</a>
     </div>
 </div>
 <div class="row g-3 mb-4">
@@ -124,7 +130,13 @@ include __DIR__ . '/includes/header.php';
 <div class="row g-3">
     <div class="col-12 col-xl-8">
         <div class="chart-panel">
-            <h2 class="h6 mb-3">Sales Trend - Last 7 Days</h2>
+            <div class="d-flex flex-column flex-sm-row justify-content-between gap-2 mb-3">
+                <h2 class="h6 mb-0">Sales Trend - Last 7 Days</h2>
+                <div class="btn-group no-print" role="group" aria-label="Sales trend type">
+                    <a class="btn btn-sm <?= $trendType === 'all' ? 'btn-primary' : 'btn-outline-primary' ?>" href="index.php?period=<?= h($period) ?>&trend=all">All</a>
+                    <a class="btn btn-sm <?= $trendType === 'gerai' ? 'btn-primary' : 'btn-outline-primary' ?>" href="index.php?period=<?= h($period) ?>&trend=gerai">Gerai</a>
+                </div>
+            </div>
             <canvas id="salesTrendChart" data-labels='<?= h(json_encode($trendLabels)) ?>' data-values='<?= h(json_encode($trendValues)) ?>'></canvas>
         </div>
     </div>
@@ -143,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function () {
             type: 'line',
             data: {
                 labels: JSON.parse(trend.dataset.labels || '[]'),
-                datasets: [{ label: 'Sales', data: JSON.parse(trend.dataset.values || '[]'), borderColor: '#0f766e', backgroundColor: 'rgba(15,118,110,.12)', fill: true, tension: .35 }]
+                datasets: [{ label: <?= json_encode($trendType === 'gerai' ? 'Gerai' : 'All Sales') ?>, data: JSON.parse(trend.dataset.values || '[]'), borderColor: '#0f766e', backgroundColor: 'rgba(15,118,110,.12)', fill: true, tension: .35 }]
             }
         });
     }
