@@ -49,44 +49,13 @@ $rows = db()->query("SELECT * FROM sales WHERE sale_type = 'Gerai' ORDER BY sale
 $pageTitle = 'Daily Sales';
 include __DIR__ . '/includes/header.php';
 ?>
-<div class="row g-3">
-    <div class="col-12 col-xl-4">
-        <div class="form-card">
-            <h1 class="h5 mb-3"><?= $editRow ? 'Edit Daily Sale' : 'Add Daily Sale' ?></h1>
-            <form method="post" data-calc-total>
-                <?= csrf_field() ?>
-                <input type="hidden" name="action" value="<?= $editRow ? 'update' : 'create' ?>">
-                <?php if ($editRow): ?><input type="hidden" name="id" value="<?= h((string) $editRow['id']) ?>"><?php endif; ?>
-                <div class="mb-3">
-                    <label class="form-label">Sale Date</label>
-                    <input class="form-control" type="date" name="sale_date" value="<?= h($editRow['sale_date'] ?? date('Y-m-d')) ?>" required>
-                </div>
-                <div class="row g-2">
-                    <div class="col-6 mb-3">
-                        <label class="form-label">Quantity</label>
-                        <input class="form-control" type="number" name="qty" min="1" value="<?= h((string) ($editRow['qty'] ?? 1)) ?>" data-qty required>
-                    </div>
-                    <div class="col-6 mb-3">
-                        <label class="form-label">Unit Price</label>
-                        <input class="form-control" type="number" name="unit_price" min="0" step="0.01" value="<?= h((string) ($editRow['unit_price'] ?? current_default_price())) ?>" data-unit-price required>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Total</label>
-                    <input class="form-control" type="number" name="total" step="0.01" data-total readonly>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Remarks</label>
-                    <textarea class="form-control" name="remarks" rows="3"><?= h($editRow['remarks'] ?? '') ?></textarea>
-                </div>
-                <button class="btn btn-primary w-100" type="submit"><?= $editRow ? 'Update Daily Sale' : 'Save Daily Sale' ?></button>
-                <?php if ($editRow): ?><a class="btn btn-outline-secondary w-100 mt-2" href="sales.php">Cancel Edit</a><?php endif; ?>
-            </form>
-        </div>
+<div class="table-card">
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-3">
+        <h1 class="h5 mb-0">Daily Sales Records</h1>
+        <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#saleModal">
+            <i class="bi bi-plus-lg me-1"></i>Add Daily Sale
+        </button>
     </div>
-    <div class="col-12 col-xl-8">
-        <div class="table-card">
-            <h2 class="h5 mb-3">Daily Sales Records</h2>
             <div class="table-responsive">
                 <table class="table table-striped align-middle datatable">
                     <thead><tr><th>Date</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Remarks</th><th>Actions</th></tr></thead>
@@ -114,7 +83,55 @@ include __DIR__ . '/includes/header.php';
                     </tbody>
                 </table>
             </div>
+</div>
+<div class="modal fade" id="saleModal" tabindex="-1" aria-labelledby="saleModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" data-calc-total>
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="saleModalLabel"><?= $editRow ? 'Edit Daily Sale' : 'Add Daily Sale' ?></h2>
+                    <a class="btn-close" href="sales.php" aria-label="Close"></a>
+                </div>
+                <div class="modal-body">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="<?= $editRow ? 'update' : 'create' ?>">
+                    <?php if ($editRow): ?><input type="hidden" name="id" value="<?= h((string) $editRow['id']) ?>"><?php endif; ?>
+                    <div class="mb-3">
+                        <label class="form-label">Sale Date</label>
+                        <input class="form-control" type="date" name="sale_date" value="<?= h($editRow['sale_date'] ?? date('Y-m-d')) ?>" required>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Quantity</label>
+                            <input class="form-control" type="number" name="qty" min="1" value="<?= h((string) ($editRow['qty'] ?? 1)) ?>" data-qty required>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Unit Price</label>
+                            <input class="form-control" type="number" name="unit_price" min="0" step="0.01" value="<?= h((string) ($editRow['unit_price'] ?? current_default_price())) ?>" data-unit-price required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Total</label>
+                        <input class="form-control" type="number" name="total" step="0.01" data-total readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Remarks</label>
+                        <textarea class="form-control" name="remarks" rows="3"><?= h($editRow['remarks'] ?? '') ?></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <?php if ($editRow): ?><a class="btn btn-outline-secondary" href="sales.php">Cancel</a><?php endif; ?>
+                    <button class="btn btn-primary" type="submit"><?= $editRow ? 'Update Daily Sale' : 'Save Daily Sale' ?></button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
+<?php if ($editRow): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('saleModal')).show();
+});
+</script>
+<?php endif; ?>
 <?php include __DIR__ . '/includes/footer.php'; ?>

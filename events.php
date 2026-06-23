@@ -53,58 +53,13 @@ $rows = db()->query('SELECT * FROM events ORDER BY event_date DESC, id DESC')->f
 $pageTitle = 'Catering';
 include __DIR__ . '/includes/header.php';
 ?>
-<div class="row g-3">
-    <div class="col-12 col-xl-4">
-        <div class="form-card">
-            <h1 class="h5 mb-3"><?= $editRow ? 'Edit Catering' : 'Add Catering' ?></h1>
-            <form method="post" data-event-balance>
-                <?= csrf_field() ?>
-                <input type="hidden" name="action" value="<?= $editRow ? 'update' : 'create' ?>">
-                <?php if ($editRow): ?><input type="hidden" name="id" value="<?= h((string) $editRow['id']) ?>"><?php endif; ?>
-                <div class="mb-3">
-                    <label class="form-label">Catering Date</label>
-                    <input class="form-control" type="date" name="event_date" value="<?= h($editRow['event_date'] ?? date('Y-m-d')) ?>" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Catering Place</label>
-                    <input class="form-control" name="event_place" value="<?= h($editRow['event_place'] ?? '') ?>" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Package</label>
-                    <input class="form-control" name="package_name" value="<?= h($editRow['package_name'] ?? '') ?>" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Price</label>
-                    <input class="form-control" type="number" name="price" min="0" step="0.01" value="<?= h((string) ($editRow['price'] ?? '')) ?>" data-event-price required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Deposit Paid</label>
-                    <input class="form-control" type="number" name="deposit_paid" min="0" step="0.01" value="<?= h((string) ($editRow['deposit_paid'] ?? '0.00')) ?>" data-event-deposit required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Deposit Date</label>
-                    <input class="form-control" type="date" name="deposit_date" value="<?= h($editRow['deposit_date'] ?? date('Y-m-d')) ?>">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Balance Paid</label>
-                    <input class="form-control" type="number" name="balance_paid" min="0" step="0.01" value="<?= h((string) ($editRow['balance_paid'] ?? '0.00')) ?>" data-event-balance-paid required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Balance Paid Date</label>
-                    <input class="form-control" type="date" name="balance_paid_date" value="<?= h($editRow['balance_paid_date'] ?? '') ?>">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Balance Remaining</label>
-                    <input class="form-control" type="number" step="0.01" data-event-balance-output readonly>
-                </div>
-                <button class="btn btn-primary w-100" type="submit"><?= $editRow ? 'Update Catering' : 'Save Catering' ?></button>
-                <?php if ($editRow): ?><a class="btn btn-outline-secondary w-100 mt-2" href="events.php">Cancel Edit</a><?php endif; ?>
-            </form>
-        </div>
+<div class="table-card">
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-3">
+        <h1 class="h5 mb-0">Catering Records</h1>
+        <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#cateringModal">
+            <i class="bi bi-plus-lg me-1"></i>Add Catering
+        </button>
     </div>
-    <div class="col-12 col-xl-8">
-        <div class="table-card">
-            <h2 class="h5 mb-3">Catering Records</h2>
             <div class="table-responsive">
                 <table class="table table-striped align-middle datatable">
                     <thead><tr><th>Catering Date</th><th>Place</th><th>Package</th><th>Price</th><th>Deposit</th><th>Balance Paid</th><th>Balance Remaining</th><th>Actions</th></tr></thead>
@@ -134,7 +89,71 @@ include __DIR__ . '/includes/header.php';
                     </tbody>
                 </table>
             </div>
+</div>
+<div class="modal fade" id="cateringModal" tabindex="-1" aria-labelledby="cateringModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="post" data-event-balance>
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="cateringModalLabel"><?= $editRow ? 'Edit Catering' : 'Add Catering' ?></h2>
+                    <a class="btn-close" href="events.php" aria-label="Close"></a>
+                </div>
+                <div class="modal-body">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="<?= $editRow ? 'update' : 'create' ?>">
+                    <?php if ($editRow): ?><input type="hidden" name="id" value="<?= h((string) $editRow['id']) ?>"><?php endif; ?>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Catering Date</label>
+                            <input class="form-control" type="date" name="event_date" value="<?= h($editRow['event_date'] ?? date('Y-m-d')) ?>" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Catering Place</label>
+                            <input class="form-control" name="event_place" value="<?= h($editRow['event_place'] ?? '') ?>" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Package</label>
+                            <input class="form-control" name="package_name" value="<?= h($editRow['package_name'] ?? '') ?>" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Price</label>
+                            <input class="form-control" type="number" name="price" min="0" step="0.01" value="<?= h((string) ($editRow['price'] ?? '')) ?>" data-event-price required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Deposit Paid</label>
+                            <input class="form-control" type="number" name="deposit_paid" min="0" step="0.01" value="<?= h((string) ($editRow['deposit_paid'] ?? '0.00')) ?>" data-event-deposit required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Deposit Date</label>
+                            <input class="form-control" type="date" name="deposit_date" value="<?= h($editRow['deposit_date'] ?? date('Y-m-d')) ?>">
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Balance Paid</label>
+                            <input class="form-control" type="number" name="balance_paid" min="0" step="0.01" value="<?= h((string) ($editRow['balance_paid'] ?? '0.00')) ?>" data-event-balance-paid required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Balance Paid Date</label>
+                            <input class="form-control" type="date" name="balance_paid_date" value="<?= h($editRow['balance_paid_date'] ?? '') ?>">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Balance Remaining</label>
+                            <input class="form-control" type="number" step="0.01" data-event-balance-output readonly>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <?php if ($editRow): ?><a class="btn btn-outline-secondary" href="events.php">Cancel</a><?php endif; ?>
+                    <button class="btn btn-primary" type="submit"><?= $editRow ? 'Update Catering' : 'Save Catering' ?></button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
+<?php if ($editRow): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('cateringModal')).show();
+});
+</script>
+<?php endif; ?>
 <?php include __DIR__ . '/includes/footer.php'; ?>

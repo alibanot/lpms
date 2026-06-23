@@ -72,78 +72,23 @@ if (in_array($filterStatus, $statuses, true)) {
 $pageTitle = 'Tempahan';
 include __DIR__ . '/includes/header.php';
 ?>
-<div class="row g-3">
-    <div class="col-12 col-xl-4">
-        <div class="form-card">
-            <h1 class="h5 mb-3"><?= $editRow ? 'Edit Order' : 'Add Order' ?></h1>
-            <form method="post" data-calc-total>
-                <?= csrf_field() ?>
-                <input type="hidden" name="action" value="<?= $editRow ? 'update' : 'create' ?>">
-                <?php if ($editRow): ?><input type="hidden" name="id" value="<?= h((string) $editRow['id']) ?>"><?php endif; ?>
-                <div class="mb-3">
-                    <label class="form-label">Customer Name</label>
-                    <input class="form-control" name="customer_name" value="<?= h($editRow['customer_name'] ?? '') ?>" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Phone Number</label>
-                    <input class="form-control" name="phone" inputmode="tel" value="<?= h($editRow['phone'] ?? '') ?>" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Type</label>
-                    <select class="form-select" name="order_type" required>
-                        <?php foreach ($orderTypes as $type): ?>
-                            <option value="<?= h($type) ?>" <?= (($editRow['order_type'] ?? 'Tempahan') === $type) ? 'selected' : '' ?>><?= h($type) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Pickup Date</label>
-                    <input class="form-control" type="date" name="pickup_date" value="<?= h($editRow['pickup_date'] ?? date('Y-m-d')) ?>" required>
-                </div>
-                <div class="row g-2">
-                    <div class="col-6 mb-3">
-                        <label class="form-label">Quantity</label>
-                        <input class="form-control" type="number" name="qty" min="1" value="<?= h((string) ($editRow['qty'] ?? 1)) ?>" data-qty required>
-                    </div>
-                    <div class="col-6 mb-3">
-                        <label class="form-label">Unit Price</label>
-                        <input class="form-control" type="number" name="unit_price" min="0" step="0.01" value="<?= h((string) ($editRow['unit_price'] ?? current_default_price())) ?>" data-unit-price required>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Total</label>
-                    <input class="form-control" type="number" step="0.01" data-total readonly>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Status</label>
-                    <select class="form-select" name="status">
-                        <?php foreach ($statuses as $status): ?>
-                            <option value="<?= h($status) ?>" <?= (($editRow['status'] ?? '') === $status) ? 'selected' : '' ?>><?= h($status) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Remarks</label>
-                    <textarea class="form-control" name="remarks" rows="3"><?= h($editRow['remarks'] ?? '') ?></textarea>
-                </div>
-                <button class="btn btn-primary w-100" type="submit"><?= $editRow ? 'Update Order' : 'Save Order' ?></button>
-                <?php if ($editRow): ?><a class="btn btn-outline-secondary w-100 mt-2" href="orders.php">Cancel Edit</a><?php endif; ?>
-            </form>
-        </div>
-    </div>
-    <div class="col-12 col-xl-8">
-        <div class="table-card">
+<div class="table-card">
             <div class="d-flex flex-column flex-sm-row justify-content-between gap-2 mb-3">
                 <h2 class="h5 mb-0">Order List</h2>
-                <form class="d-flex gap-2" method="get">
-                    <select class="form-select form-select-sm" name="status">
-                        <option value="">All Status</option>
-                        <?php foreach ($statuses as $status): ?>
-                            <option value="<?= h($status) ?>" <?= $filterStatus === $status ? 'selected' : '' ?>><?= h($status) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <button class="btn btn-sm btn-outline-primary" type="submit">Filter</button>
-                </form>
+                <div class="d-flex flex-column flex-sm-row gap-2">
+                    <form class="d-flex gap-2" method="get">
+                        <select class="form-select form-select-sm" name="status">
+                            <option value="">All Status</option>
+                            <?php foreach ($statuses as $status): ?>
+                                <option value="<?= h($status) ?>" <?= $filterStatus === $status ? 'selected' : '' ?>><?= h($status) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button class="btn btn-sm btn-outline-primary" type="submit">Filter</button>
+                    </form>
+                    <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#orderModal">
+                        <i class="bi bi-plus-lg me-1"></i>Add Order
+                    </button>
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="table table-striped align-middle datatable">
@@ -186,7 +131,79 @@ include __DIR__ . '/includes/header.php';
                     </tbody>
                 </table>
             </div>
+</div>
+<div class="modal fade" id="orderModal" tabindex="-1" aria-labelledby="orderModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="post" data-calc-total>
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="orderModalLabel"><?= $editRow ? 'Edit Order' : 'Add Order' ?></h2>
+                    <a class="btn-close" href="orders.php" aria-label="Close"></a>
+                </div>
+                <div class="modal-body">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="<?= $editRow ? 'update' : 'create' ?>">
+                    <?php if ($editRow): ?><input type="hidden" name="id" value="<?= h((string) $editRow['id']) ?>"><?php endif; ?>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Customer Name</label>
+                            <input class="form-control" name="customer_name" value="<?= h($editRow['customer_name'] ?? '') ?>" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Phone Number</label>
+                            <input class="form-control" name="phone" inputmode="tel" value="<?= h($editRow['phone'] ?? '') ?>" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Type</label>
+                            <select class="form-select" name="order_type" required>
+                                <?php foreach ($orderTypes as $type): ?>
+                                    <option value="<?= h($type) ?>" <?= (($editRow['order_type'] ?? 'Tempahan') === $type) ? 'selected' : '' ?>><?= h($type) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Pickup Date</label>
+                            <input class="form-control" type="date" name="pickup_date" value="<?= h($editRow['pickup_date'] ?? date('Y-m-d')) ?>" required>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Quantity</label>
+                            <input class="form-control" type="number" name="qty" min="1" value="<?= h((string) ($editRow['qty'] ?? 1)) ?>" data-qty required>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Unit Price</label>
+                            <input class="form-control" type="number" name="unit_price" min="0" step="0.01" value="<?= h((string) ($editRow['unit_price'] ?? current_default_price())) ?>" data-unit-price required>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Total</label>
+                            <input class="form-control" type="number" step="0.01" data-total readonly>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="status">
+                                <?php foreach ($statuses as $status): ?>
+                                    <option value="<?= h($status) ?>" <?= (($editRow['status'] ?? '') === $status) ? 'selected' : '' ?>><?= h($status) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Remarks</label>
+                            <textarea class="form-control" name="remarks" rows="3"><?= h($editRow['remarks'] ?? '') ?></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <?php if ($editRow): ?><a class="btn btn-outline-secondary" href="orders.php">Cancel</a><?php endif; ?>
+                    <button class="btn btn-primary" type="submit"><?= $editRow ? 'Update Order' : 'Save Order' ?></button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
+<?php if ($editRow): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('orderModal')).show();
+});
+</script>
+<?php endif; ?>
 <?php include __DIR__ . '/includes/footer.php'; ?>
