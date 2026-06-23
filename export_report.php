@@ -5,12 +5,27 @@ require_login();
 $filter = $_GET['filter'] ?? 'today';
 [$startDate, $endDate] = report_date_range($filter, $_GET['start_date'] ?? null, $_GET['end_date'] ?? null);
 
-$stmt = db()->prepare('SELECT sale_type, COALESCE(SUM(qty),0) qty, COALESCE(SUM(total),0) total FROM sales WHERE sale_date BETWEEN ? AND ? GROUP BY sale_type');
-$stmt->execute([$startDate, $endDate]);
+$stmt = db()->prepare("
+    SELECT sale_type, COALESCE(SUM(qty),0) qty, COALESCE(SUM(total),0) total
+    FROM (
+        SELECT sale_type, qty, total FROM sales WHERE sale_date BETWEEN ? AND ?
+        UNION ALL
+        SELECT 'Tempahan' AS sale_type, qty, total FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
+    ) report_sales
+    GROUP BY sale_type
+");
+$stmt->execute([$startDate, $endDate, $startDate, $endDate]);
 $rows = $stmt->fetchAll();
 
-$stmt = db()->prepare('SELECT COALESCE(SUM(total),0), COALESCE(SUM(qty),0) FROM sales WHERE sale_date BETWEEN ? AND ?');
-$stmt->execute([$startDate, $endDate]);
+$stmt = db()->prepare("
+    SELECT COALESCE(SUM(total),0), COALESCE(SUM(qty),0)
+    FROM (
+        SELECT total, qty FROM sales WHERE sale_date BETWEEN ? AND ?
+        UNION ALL
+        SELECT total, qty FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
+    ) report_sales
+");
+$stmt->execute([$startDate, $endDate, $startDate, $endDate]);
 [$totalSales, $totalQty] = $stmt->fetch(PDO::FETCH_NUM);
 
 $stmt = db()->prepare('SELECT COALESCE(SUM(amount),0) FROM expenses WHERE expense_date BETWEEN ? AND ?');
@@ -34,4 +49,3 @@ foreach ($rows as $row) {
     fputcsv($out, [$row['sale_type'], $row['qty'], $row['total']]);
 }
 fclose($out);
-

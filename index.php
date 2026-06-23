@@ -6,16 +6,30 @@ $today = date('Y-m-d');
 $monthStart = date('Y-m-01');
 $monthEnd = date('Y-m-t');
 
-$stmt = db()->prepare('SELECT COALESCE(SUM(total),0) total, COALESCE(SUM(qty),0) qty FROM sales WHERE sale_date = ?');
-$stmt->execute([$today]);
+$stmt = db()->prepare("
+    SELECT COALESCE(SUM(total),0) total, COALESCE(SUM(qty),0) qty
+    FROM (
+        SELECT total, qty FROM sales WHERE sale_date = ?
+        UNION ALL
+        SELECT total, qty FROM orders WHERE status = 'Completed' AND pickup_date = ?
+    ) dashboard_sales
+");
+$stmt->execute([$today, $today]);
 $todaySales = $stmt->fetch();
 
 $stmt = db()->prepare('SELECT COALESCE(SUM(amount),0) total FROM expenses WHERE expense_date = ?');
 $stmt->execute([$today]);
 $todayExpenses = $stmt->fetchColumn();
 
-$stmt = db()->prepare('SELECT COALESCE(SUM(total),0) total, COALESCE(SUM(qty),0) qty FROM sales WHERE sale_date BETWEEN ? AND ?');
-$stmt->execute([$monthStart, $monthEnd]);
+$stmt = db()->prepare("
+    SELECT COALESCE(SUM(total),0) total, COALESCE(SUM(qty),0) qty
+    FROM (
+        SELECT total, qty FROM sales WHERE sale_date BETWEEN ? AND ?
+        UNION ALL
+        SELECT total, qty FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
+    ) dashboard_sales
+");
+$stmt->execute([$monthStart, $monthEnd, $monthStart, $monthEnd]);
 $monthSales = $stmt->fetch();
 
 $stmt = db()->prepare('SELECT COALESCE(SUM(amount),0) total FROM expenses WHERE expense_date BETWEEN ? AND ?');
@@ -29,12 +43,27 @@ $trendValues = [];
 for ($i = 6; $i >= 0; $i--) {
     $date = date('Y-m-d', strtotime("-{$i} days"));
     $trendLabels[] = date('d M', strtotime($date));
-    $stmt = db()->prepare('SELECT COALESCE(SUM(total),0) FROM sales WHERE sale_date = ?');
-    $stmt->execute([$date]);
+    $stmt = db()->prepare("
+        SELECT COALESCE(SUM(total),0)
+        FROM (
+            SELECT total FROM sales WHERE sale_date = ?
+            UNION ALL
+            SELECT total FROM orders WHERE status = 'Completed' AND pickup_date = ?
+        ) dashboard_sales
+    ");
+    $stmt->execute([$date, $date]);
     $trendValues[] = (float) $stmt->fetchColumn();
 }
 
-$categoryRows = db()->query('SELECT sale_type, COALESCE(SUM(total),0) total FROM sales GROUP BY sale_type')->fetchAll();
+$categoryRows = db()->query("
+    SELECT sale_type, COALESCE(SUM(total),0) total
+    FROM (
+        SELECT sale_type, total FROM sales
+        UNION ALL
+        SELECT 'Tempahan' AS sale_type, total FROM orders WHERE status = 'Completed'
+    ) dashboard_sales
+    GROUP BY sale_type
+")->fetchAll();
 $categoryLabels = array_column($categoryRows, 'sale_type');
 $categoryValues = array_map('floatval', array_column($categoryRows, 'total'));
 
@@ -107,4 +136,3 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 <?php include __DIR__ . '/includes/footer.php'; ?>
-
