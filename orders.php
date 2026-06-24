@@ -5,11 +5,64 @@ require_login();
 $statuses = ['Pending', 'Ready', 'Completed', 'Cancelled'];
 $orderTypes = ['Tempahan', 'Frozen'];
 
+function frozen_stock_available_units(int $frozenStockId, int $orderId = 0): int
+{
+    $stmt = db()->prepare('
+        SELECT fs.units + COALESCE(SUM(fsm.units), 0) AS available_units
+        FROM frozen_stock fs
+        LEFT JOIN frozen_stock_movements fsm ON fsm.frozen_stock_id = fs.id AND fsm.order_id <> ?
+        WHERE fs.id = ?
+        GROUP BY fs.id, fs.units
+    ');
+    $stmt->execute([$orderId, $frozenStockId]);
+    return max(0, (int) $stmt->fetchColumn());
+}
+
+function sync_frozen_stock_movement(int $orderId): bool
+{
+    $stmt = db()->prepare('SELECT * FROM orders WHERE id = ? LIMIT 1');
+    $stmt->execute([$orderId]);
+    $order = $stmt->fetch();
+
+    if (!$order) {
+        return true;
+    }
+
+    if (($order['order_type'] ?? '') !== 'Frozen' || ($order['status'] ?? '') !== 'Completed') {
+        $stmt = db()->prepare('DELETE FROM frozen_stock_movements WHERE order_id = ?');
+        $stmt->execute([$orderId]);
+        return true;
+    }
+
+    $frozenStockId = (int) ($order['frozen_stock_id'] ?? 0);
+    $qty = (int) ($order['qty'] ?? 0);
+
+    if ($frozenStockId <= 0) {
+        $_SESSION['flash_error'] = 'Choose a frozen batch before completing this frozen order.';
+        return false;
+    }
+
+    if ($qty > frozen_stock_available_units($frozenStockId, $orderId)) {
+        $_SESSION['flash_error'] = 'Not enough frozen stock available for the selected batch.';
+        return false;
+    }
+
+    $stmt = db()->prepare('
+        INSERT INTO frozen_stock_movements (frozen_stock_id, order_id, movement_date, units)
+        VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE frozen_stock_id = VALUES(frozen_stock_id), movement_date = VALUES(movement_date), units = VALUES(units)
+    ');
+    $stmt->execute([$frozenStockId, $orderId, $order['pickup_date'], -$qty]);
+    return true;
+}
+
 if (is_post()) {
     verify_csrf();
     $action = $_POST['action'] ?? 'create';
 
     if ($action === 'delete') {
+        $stmt = db()->prepare('DELETE FROM frozen_stock_movements WHERE order_id = ?');
+        $stmt->execute([(int) ($_POST['id'] ?? 0)]);
         $stmt = db()->prepare('DELETE FROM orders WHERE id = ?');
         $stmt->execute([(int) ($_POST['id'] ?? 0)]);
         $_SESSION['flash_success'] = 'Order deleted.';
@@ -18,8 +71,23 @@ if (is_post()) {
 
     if ($action === 'status') {
         $status = in_array($_POST['status'] ?? '', $statuses, true) ? $_POST['status'] : 'Pending';
+        $orderId = (int) ($_POST['id'] ?? 0);
+        if ($status === 'Completed') {
+            $stmt = db()->prepare('SELECT order_type, frozen_stock_id, qty FROM orders WHERE id = ? LIMIT 1');
+            $stmt->execute([$orderId]);
+            $order = $stmt->fetch();
+            if (($order['order_type'] ?? '') === 'Frozen' && empty($order['frozen_stock_id'])) {
+                $_SESSION['flash_error'] = 'Choose a frozen batch before completing this frozen order.';
+                redirect('orders.php');
+            }
+            if (($order['order_type'] ?? '') === 'Frozen' && (int) ($order['qty'] ?? 0) > frozen_stock_available_units((int) $order['frozen_stock_id'], $orderId)) {
+                $_SESSION['flash_error'] = 'Not enough frozen stock available for the selected batch.';
+                redirect('orders.php');
+            }
+        }
         $stmt = db()->prepare('UPDATE orders SET status = ? WHERE id = ?');
-        $stmt->execute([$status, (int) ($_POST['id'] ?? 0)]);
+        $stmt->execute([$status, $orderId]);
+        sync_frozen_stock_movement($orderId);
         $_SESSION['flash_success'] = 'Order status updated.';
         redirect('orders.php');
     }
@@ -28,10 +96,24 @@ if (is_post()) {
     $unitPrice = max(0, (float) ($_POST['unit_price'] ?? 0));
     $status = in_array($_POST['status'] ?? '', $statuses, true) ? $_POST['status'] : 'Pending';
     $orderType = in_array($_POST['order_type'] ?? '', $orderTypes, true) ? $_POST['order_type'] : 'Tempahan';
+    $frozenStockId = $orderType === 'Frozen' ? (int) ($_POST['frozen_stock_id'] ?? 0) : null;
+    $orderId = (int) ($_POST['id'] ?? 0);
+
+    if ($orderType === 'Frozen' && $status === 'Completed' && !$frozenStockId) {
+        $_SESSION['flash_error'] = 'Choose a frozen batch before completing this frozen order.';
+        redirect($action === 'update' && $orderId ? 'orders.php?edit=' . $orderId : 'orders.php');
+    }
+
+    if ($orderType === 'Frozen' && $status === 'Completed' && $frozenStockId && $qty > frozen_stock_available_units($frozenStockId, $orderId)) {
+        $_SESSION['flash_error'] = 'Not enough frozen stock available for the selected batch.';
+        redirect($action === 'update' && $orderId ? 'orders.php?edit=' . $orderId : 'orders.php');
+    }
+
     $values = [
         trim($_POST['customer_name'] ?? ''),
         trim($_POST['phone'] ?? ''),
         $orderType,
+        $frozenStockId,
         $_POST['pickup_date'] ?? date('Y-m-d'),
         $qty,
         $unitPrice,
@@ -41,14 +123,16 @@ if (is_post()) {
     ];
 
     if ($action === 'update') {
-        $stmt = db()->prepare('UPDATE orders SET customer_name = ?, phone = ?, order_type = ?, pickup_date = ?, qty = ?, unit_price = ?, total = ?, status = ?, remarks = ? WHERE id = ?');
-        $stmt->execute([...$values, (int) ($_POST['id'] ?? 0)]);
+        $stmt = db()->prepare('UPDATE orders SET customer_name = ?, phone = ?, order_type = ?, frozen_stock_id = ?, pickup_date = ?, qty = ?, unit_price = ?, total = ?, status = ?, remarks = ? WHERE id = ?');
+        $stmt->execute([...$values, $orderId]);
+        sync_frozen_stock_movement($orderId);
         $_SESSION['flash_success'] = 'Order updated.';
         redirect('orders.php');
     }
 
-    $stmt = db()->prepare('INSERT INTO orders (customer_name, phone, order_type, pickup_date, qty, unit_price, total, status, remarks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    $stmt = db()->prepare('INSERT INTO orders (customer_name, phone, order_type, frozen_stock_id, pickup_date, qty, unit_price, total, status, remarks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
     $stmt->execute($values);
+    sync_frozen_stock_movement((int) db()->lastInsertId());
     $_SESSION['flash_success'] = 'Order saved.';
     redirect('orders.php');
 }
@@ -62,12 +146,20 @@ if (isset($_GET['edit'])) {
 
 $filterStatus = $_GET['status'] ?? '';
 if (in_array($filterStatus, $statuses, true)) {
-    $stmt = db()->prepare('SELECT * FROM orders WHERE status = ? ORDER BY pickup_date ASC, id DESC');
+    $stmt = db()->prepare('SELECT orders.*, frozen_stock.batch_no FROM orders LEFT JOIN frozen_stock ON frozen_stock.id = orders.frozen_stock_id WHERE status = ? ORDER BY pickup_date ASC, orders.id DESC');
     $stmt->execute([$filterStatus]);
     $rows = $stmt->fetchAll();
 } else {
-    $rows = db()->query('SELECT * FROM orders ORDER BY pickup_date ASC, id DESC')->fetchAll();
+    $rows = db()->query('SELECT orders.*, frozen_stock.batch_no FROM orders LEFT JOIN frozen_stock ON frozen_stock.id = orders.frozen_stock_id ORDER BY pickup_date ASC, orders.id DESC')->fetchAll();
 }
+
+$frozenBatches = db()->query("
+    SELECT fs.id, fs.batch_no, fs.units + COALESCE(SUM(fsm.units), 0) AS available_units
+    FROM frozen_stock fs
+    LEFT JOIN frozen_stock_movements fsm ON fsm.frozen_stock_id = fs.id
+    GROUP BY fs.id, fs.batch_no, fs.units
+    ORDER BY fs.expiry_date ASC, fs.batch_no ASC
+")->fetchAll();
 
 $pageTitle = 'Tempahan';
 include __DIR__ . '/includes/header.php';
@@ -92,13 +184,14 @@ include __DIR__ . '/includes/header.php';
             </div>
             <div class="table-responsive">
                 <table class="table table-striped align-middle datatable">
-                    <thead><tr><th>Customer</th><th>Phone</th><th>Type</th><th>Pickup</th><th>Qty</th><th>Total</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>Customer</th><th>Phone</th><th>Type</th><th>Batch No</th><th>Pickup</th><th>Qty</th><th>Total</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead>
                     <tbody>
                     <?php foreach ($rows as $row): ?>
                         <tr>
                             <td><?= h($row['customer_name']) ?></td>
                             <td><?= h($row['phone']) ?></td>
                             <td><?= h($row['order_type'] ?? 'Tempahan') ?></td>
+                            <td><?= h($row['batch_no'] ?? '') ?></td>
                             <td><?= h($row['pickup_date']) ?></td>
                             <td><?= number_plain($row['qty']) ?></td>
                             <td><?= money($row['total']) ?></td>
@@ -158,6 +251,17 @@ include __DIR__ . '/includes/header.php';
                             <select class="form-select" name="order_type" required>
                                 <?php foreach ($orderTypes as $type): ?>
                                     <option value="<?= h($type) ?>" <?= (($editRow['order_type'] ?? 'Tempahan') === $type) ? 'selected' : '' ?>><?= h($type) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Frozen Batch No</label>
+                            <select class="form-select" name="frozen_stock_id">
+                                <option value="">No batch</option>
+                                <?php foreach ($frozenBatches as $batch): ?>
+                                    <option value="<?= h((string) $batch['id']) ?>" <?= ((int) ($editRow['frozen_stock_id'] ?? 0) === (int) $batch['id']) ? 'selected' : '' ?>>
+                                        <?= h($batch['batch_no']) ?> (<?= number_plain($batch['available_units']) ?> units)
+                                    </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>

@@ -7,6 +7,13 @@ if (is_post()) {
     $action = $_POST['action'] ?? 'create';
 
     if ($action === 'delete') {
+        $stmt = db()->prepare('SELECT COUNT(*) FROM frozen_stock_movements WHERE frozen_stock_id = ?');
+        $stmt->execute([(int) ($_POST['id'] ?? 0)]);
+        if ((int) $stmt->fetchColumn() > 0) {
+            $_SESSION['flash_error'] = 'This batch has frozen sales records and cannot be deleted.';
+            redirect('frozen_stock.php');
+        }
+
         $stmt = db()->prepare('DELETE FROM frozen_stock WHERE id = ?');
         $stmt->execute([(int) ($_POST['id'] ?? 0)]);
         $_SESSION['flash_success'] = 'Frozen stock record deleted.';
@@ -38,6 +45,14 @@ if (is_post()) {
     ];
 
     if ($action === 'update') {
+        $stmt = db()->prepare('SELECT COALESCE(SUM(CASE WHEN units < 0 THEN -units ELSE 0 END), 0) FROM frozen_stock_movements WHERE frozen_stock_id = ?');
+        $stmt->execute([(int) ($_POST['id'] ?? 0)]);
+        $soldUnits = (int) $stmt->fetchColumn();
+        if ($units < $soldUnits) {
+            $_SESSION['flash_error'] = 'Units cannot be less than units already sold from this batch.';
+            redirect('frozen_stock.php?edit=' . (int) ($_POST['id'] ?? 0));
+        }
+
         $stmt = db()->prepare('UPDATE frozen_stock SET batch_no = ?, date_made = ?, expiry_date = ?, units = ?, units_remaining = ?, pieces_per_unit = ?, remarks = ? WHERE id = ?');
         $stmt->execute([...$values, (int) ($_POST['id'] ?? 0)]);
         $_SESSION['flash_success'] = 'Frozen stock record updated.';
@@ -60,19 +75,29 @@ if (isset($_GET['edit'])) {
 $today = date('Y-m-d');
 $soon = (new DateTimeImmutable($today))->modify('+7 days')->format('Y-m-d');
 
-$stmt = db()->prepare('SELECT COALESCE(SUM(units),0) units, COALESCE(SUM(units * pieces_per_unit),0) pieces FROM frozen_stock WHERE expiry_date >= ?');
+$stockSql = '
+    SELECT fs.*, COALESCE(m.movement_units, 0) movement_units, COALESCE(m.sold_units, 0) sold_units, fs.units + COALESCE(m.movement_units, 0) AS current_units
+    FROM frozen_stock fs
+    LEFT JOIN (
+        SELECT frozen_stock_id, SUM(units) movement_units, SUM(CASE WHEN units < 0 THEN -units ELSE 0 END) sold_units
+        FROM frozen_stock_movements
+        GROUP BY frozen_stock_id
+    ) m ON m.frozen_stock_id = fs.id
+';
+
+$stmt = db()->prepare("SELECT COALESCE(SUM(current_units),0) units, COALESCE(SUM(current_units * pieces_per_unit),0) pieces FROM ($stockSql) stock WHERE expiry_date >= ? AND current_units > 0");
 $stmt->execute([$today]);
 $currentStock = $stmt->fetch();
 
-$stmt = db()->prepare('SELECT COALESCE(SUM(units),0) units, COALESCE(SUM(units * pieces_per_unit),0) pieces FROM frozen_stock WHERE expiry_date < ?');
+$stmt = db()->prepare("SELECT COALESCE(SUM(current_units),0) units, COALESCE(SUM(current_units * pieces_per_unit),0) pieces FROM ($stockSql) stock WHERE expiry_date < ? AND current_units > 0");
 $stmt->execute([$today]);
 $expiredStock = $stmt->fetch();
 
-$stmt = db()->prepare('SELECT COALESCE(SUM(units),0) units, COALESCE(SUM(units * pieces_per_unit),0) pieces FROM frozen_stock WHERE expiry_date BETWEEN ? AND ?');
+$stmt = db()->prepare("SELECT COALESCE(SUM(current_units),0) units, COALESCE(SUM(current_units * pieces_per_unit),0) pieces FROM ($stockSql) stock WHERE expiry_date BETWEEN ? AND ? AND current_units > 0");
 $stmt->execute([$today, $soon]);
 $expiringStock = $stmt->fetch();
 
-$rows = db()->query('SELECT * FROM frozen_stock ORDER BY expiry_date ASC, date_made DESC, id DESC')->fetchAll();
+$rows = db()->query($stockSql . ' ORDER BY fs.expiry_date ASC, fs.date_made DESC, fs.id DESC')->fetchAll();
 $pageTitle = 'Frozen Stock';
 include __DIR__ . '/includes/header.php';
 ?>
@@ -114,22 +139,25 @@ include __DIR__ . '/includes/header.php';
     </div>
     <div class="table-responsive">
         <table class="table table-striped align-middle datatable">
-            <thead><tr><th>Batch No</th><th>Date Made</th><th>Expiry Date</th><th>Units</th><th>Pieces / Unit</th><th>Total Pieces</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Batch No</th><th>Date Made</th><th>Expiry Date</th><th>Units Made</th><th>Sold</th><th>Current</th><th>Pieces / Unit</th><th>Current Pieces</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead>
             <tbody>
             <?php foreach ($rows as $row): ?>
                 <?php
                 $isExpired = $row['expiry_date'] < $today;
                 $isExpiring = !$isExpired && $row['expiry_date'] <= $soon;
-                $status = $isExpired ? 'Expired' : ($isExpiring ? 'Expiring Soon' : 'Available');
-                $badge = $isExpired ? 'text-bg-danger' : ($isExpiring ? 'text-bg-warning' : 'text-bg-success');
+                $currentUnits = max(0, (int) $row['current_units']);
+                $status = $currentUnits <= 0 ? 'Sold Out' : ($isExpired ? 'Expired' : ($isExpiring ? 'Expiring Soon' : 'Available'));
+                $badge = $currentUnits <= 0 ? 'text-bg-secondary' : ($isExpired ? 'text-bg-danger' : ($isExpiring ? 'text-bg-warning' : 'text-bg-success'));
                 ?>
                 <tr>
                     <td><?= h($row['batch_no']) ?></td>
                     <td><?= h($row['date_made']) ?></td>
                     <td><?= h($row['expiry_date']) ?></td>
                     <td><?= number_plain($row['units']) ?></td>
+                    <td><?= number_plain($row['sold_units']) ?></td>
+                    <td><?= number_plain($currentUnits) ?></td>
                     <td><?= number_plain($row['pieces_per_unit']) ?></td>
-                    <td><?= number_plain((int) $row['units'] * (int) $row['pieces_per_unit']) ?></td>
+                    <td><?= number_plain($currentUnits * (int) $row['pieces_per_unit']) ?></td>
                     <td><span class="badge <?= h($badge) ?>"><?= h($status) ?></span></td>
                     <td><?= h($row['remarks']) ?></td>
                     <td>
