@@ -81,12 +81,12 @@ $(function () {
             $scope.find('[data-expiry-date]').val(expiry.toISOString().slice(0, 10));
         };
         const updateTotal = function () {
-            const remaining = parseInt($scope.find('[data-stock-remaining]').val(), 10) || 0;
+            const units = parseInt($scope.find('[data-stock-units]').val(), 10) || 0;
             const pieces = parseInt($scope.find('[data-stock-pieces]').val(), 10) || 0;
-            $scope.find('[data-stock-total]').val(remaining * pieces);
+            $scope.find('[data-stock-total]').val(units * pieces);
         };
         $scope.on('change', '[data-date-made]', updateExpiry);
-        $scope.on('input', '[data-stock-remaining], [data-stock-pieces]', updateTotal);
+        $scope.on('input', '[data-stock-units], [data-stock-pieces]', updateTotal);
         updateTotal();
     });
 });

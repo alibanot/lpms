@@ -14,7 +14,7 @@ if (is_post()) {
     }
 
     $units = max(0, (int) ($_POST['units'] ?? 0));
-    $unitsRemaining = max(0, min($units, (int) ($_POST['units_remaining'] ?? $units)));
+    $unitsRemaining = $units;
     $piecesPerUnit = max(0, (int) ($_POST['pieces_per_unit'] ?? 0));
     $dateMade = $_POST['date_made'] ?? date('Y-m-d');
     $expiryDate = $_POST['expiry_date'] ?: (new DateTimeImmutable($dateMade))->modify('+2 months')->format('Y-m-d');
@@ -60,15 +60,15 @@ if (isset($_GET['edit'])) {
 $today = date('Y-m-d');
 $soon = (new DateTimeImmutable($today))->modify('+7 days')->format('Y-m-d');
 
-$stmt = db()->prepare('SELECT COALESCE(SUM(units_remaining),0) units, COALESCE(SUM(units_remaining * pieces_per_unit),0) pieces FROM frozen_stock WHERE expiry_date >= ?');
+$stmt = db()->prepare('SELECT COALESCE(SUM(units),0) units, COALESCE(SUM(units * pieces_per_unit),0) pieces FROM frozen_stock WHERE expiry_date >= ?');
 $stmt->execute([$today]);
 $currentStock = $stmt->fetch();
 
-$stmt = db()->prepare('SELECT COALESCE(SUM(units_remaining),0) units, COALESCE(SUM(units_remaining * pieces_per_unit),0) pieces FROM frozen_stock WHERE expiry_date < ? AND units_remaining > 0');
+$stmt = db()->prepare('SELECT COALESCE(SUM(units),0) units, COALESCE(SUM(units * pieces_per_unit),0) pieces FROM frozen_stock WHERE expiry_date < ?');
 $stmt->execute([$today]);
 $expiredStock = $stmt->fetch();
 
-$stmt = db()->prepare('SELECT COALESCE(SUM(units_remaining),0) units, COALESCE(SUM(units_remaining * pieces_per_unit),0) pieces FROM frozen_stock WHERE expiry_date BETWEEN ? AND ? AND units_remaining > 0');
+$stmt = db()->prepare('SELECT COALESCE(SUM(units),0) units, COALESCE(SUM(units * pieces_per_unit),0) pieces FROM frozen_stock WHERE expiry_date BETWEEN ? AND ?');
 $stmt->execute([$today, $soon]);
 $expiringStock = $stmt->fetch();
 
@@ -114,7 +114,7 @@ include __DIR__ . '/includes/header.php';
     </div>
     <div class="table-responsive">
         <table class="table table-striped align-middle datatable">
-            <thead><tr><th>Batch No</th><th>Date Made</th><th>Expiry Date</th><th>Units</th><th>Remaining</th><th>Pieces / Unit</th><th>Total Pieces</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Batch No</th><th>Date Made</th><th>Expiry Date</th><th>Units</th><th>Pieces / Unit</th><th>Total Pieces</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead>
             <tbody>
             <?php foreach ($rows as $row): ?>
                 <?php
@@ -128,9 +128,8 @@ include __DIR__ . '/includes/header.php';
                     <td><?= h($row['date_made']) ?></td>
                     <td><?= h($row['expiry_date']) ?></td>
                     <td><?= number_plain($row['units']) ?></td>
-                    <td><?= number_plain($row['units_remaining']) ?></td>
                     <td><?= number_plain($row['pieces_per_unit']) ?></td>
-                    <td><?= number_plain((int) $row['units_remaining'] * (int) $row['pieces_per_unit']) ?></td>
+                    <td><?= number_plain((int) $row['units'] * (int) $row['pieces_per_unit']) ?></td>
                     <td><span class="badge <?= h($badge) ?>"><?= h($status) ?></span></td>
                     <td><?= h($row['remarks']) ?></td>
                     <td>
@@ -176,19 +175,15 @@ include __DIR__ . '/includes/header.php';
                             <input class="form-control" type="date" name="expiry_date" value="<?= h($editRow['expiry_date'] ?? (new DateTimeImmutable())->modify('+2 months')->format('Y-m-d')) ?>" data-expiry-date required>
                         </div>
                         <div class="col-12 col-md-4">
-                            <label class="form-label">Unit</label>
+                            <label class="form-label">Units</label>
                             <input class="form-control" type="number" name="units" min="0" value="<?= h((string) ($editRow['units'] ?? 1)) ?>" data-stock-units required>
-                        </div>
-                        <div class="col-12 col-md-4">
-                            <label class="form-label">Unit Remaining</label>
-                            <input class="form-control" type="number" name="units_remaining" min="0" value="<?= h((string) ($editRow['units_remaining'] ?? $editRow['units'] ?? 1)) ?>" data-stock-remaining required>
                         </div>
                         <div class="col-12 col-md-4">
                             <label class="form-label">Pieces Per Unit</label>
                             <input class="form-control" type="number" name="pieces_per_unit" min="0" value="<?= h((string) ($editRow['pieces_per_unit'] ?? 1)) ?>" data-stock-pieces required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Total Pieces Remaining</label>
+                            <label class="form-label">Total Pieces</label>
                             <input class="form-control" type="number" data-stock-total readonly>
                         </div>
                         <div class="col-12">
