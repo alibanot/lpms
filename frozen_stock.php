@@ -18,8 +18,17 @@ if (is_post()) {
     $piecesPerUnit = max(0, (int) ($_POST['pieces_per_unit'] ?? 0));
     $dateMade = $_POST['date_made'] ?? date('Y-m-d');
     $expiryDate = $_POST['expiry_date'] ?: (new DateTimeImmutable($dateMade))->modify('+2 months')->format('Y-m-d');
+    $batchNo = trim($_POST['batch_no'] ?? '');
+
+    if ($batchNo === '') {
+        $prefix = 'FZ-' . date('Ymd', strtotime($dateMade));
+        $stmt = db()->prepare('SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(batch_no, "-", -1) AS UNSIGNED)), 0) FROM frozen_stock WHERE batch_no LIKE ?');
+        $stmt->execute([$prefix . '-%']);
+        $batchNo = $prefix . '-' . str_pad((string) ((int) $stmt->fetchColumn() + 1), 3, '0', STR_PAD_LEFT);
+    }
 
     $values = [
+        $batchNo,
         $dateMade,
         $expiryDate,
         $units,
@@ -29,13 +38,13 @@ if (is_post()) {
     ];
 
     if ($action === 'update') {
-        $stmt = db()->prepare('UPDATE frozen_stock SET date_made = ?, expiry_date = ?, units = ?, units_remaining = ?, pieces_per_unit = ?, remarks = ? WHERE id = ?');
+        $stmt = db()->prepare('UPDATE frozen_stock SET batch_no = ?, date_made = ?, expiry_date = ?, units = ?, units_remaining = ?, pieces_per_unit = ?, remarks = ? WHERE id = ?');
         $stmt->execute([...$values, (int) ($_POST['id'] ?? 0)]);
         $_SESSION['flash_success'] = 'Frozen stock record updated.';
         redirect('frozen_stock.php');
     }
 
-    $stmt = db()->prepare('INSERT INTO frozen_stock (date_made, expiry_date, units, units_remaining, pieces_per_unit, remarks) VALUES (?, ?, ?, ?, ?, ?)');
+    $stmt = db()->prepare('INSERT INTO frozen_stock (batch_no, date_made, expiry_date, units, units_remaining, pieces_per_unit, remarks) VALUES (?, ?, ?, ?, ?, ?, ?)');
     $stmt->execute($values);
     $_SESSION['flash_success'] = 'Frozen stock record saved.';
     redirect('frozen_stock.php');
@@ -105,7 +114,7 @@ include __DIR__ . '/includes/header.php';
     </div>
     <div class="table-responsive">
         <table class="table table-striped align-middle datatable">
-            <thead><tr><th>Date Made</th><th>Expiry Date</th><th>Units</th><th>Remaining</th><th>Pieces / Unit</th><th>Total Pieces</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Batch No</th><th>Date Made</th><th>Expiry Date</th><th>Units</th><th>Remaining</th><th>Pieces / Unit</th><th>Total Pieces</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead>
             <tbody>
             <?php foreach ($rows as $row): ?>
                 <?php
@@ -115,6 +124,7 @@ include __DIR__ . '/includes/header.php';
                 $badge = $isExpired ? 'text-bg-danger' : ($isExpiring ? 'text-bg-warning' : 'text-bg-success');
                 ?>
                 <tr>
+                    <td><?= h($row['batch_no']) ?></td>
                     <td><?= h($row['date_made']) ?></td>
                     <td><?= h($row['expiry_date']) ?></td>
                     <td><?= number_plain($row['units']) ?></td>
@@ -153,6 +163,10 @@ include __DIR__ . '/includes/header.php';
                     <input type="hidden" name="action" value="<?= $editRow ? 'update' : 'create' ?>">
                     <?php if ($editRow): ?><input type="hidden" name="id" value="<?= h((string) $editRow['id']) ?>"><?php endif; ?>
                     <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Batch No</label>
+                            <input class="form-control" name="batch_no" value="<?= h($editRow['batch_no'] ?? '') ?>" placeholder="Auto generated if blank">
+                        </div>
                         <div class="col-12 col-md-6">
                             <label class="form-label">Date Made</label>
                             <input class="form-control" type="date" name="date_made" value="<?= h($editRow['date_made'] ?? date('Y-m-d')) ?>" data-date-made required>
