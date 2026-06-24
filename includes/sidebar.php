@@ -4,6 +4,7 @@ $items = [
     ['sales.php', 'bi-receipt', 'Daily Sales'],
     ['expenses.php', 'bi-wallet2', 'Expenses'],
     ['orders.php', 'bi-bag-check', 'Tempahan'],
+    ['frozen_stock.php', 'bi-snow2', 'Frozen Stock'],
     ['events.php', 'bi-calendar-event', 'Catering'],
     ['reports.php', 'bi-bar-chart-line', 'Reports'],
     ['settings.php', 'bi-gear', 'Settings'],

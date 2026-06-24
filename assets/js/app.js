@@ -68,4 +68,25 @@ $(function () {
     $('[data-report-date]').on('change', function () {
         $('#reportFilter').val('custom');
     });
+
+    $('[data-frozen-stock]').each(function () {
+        const $scope = $(this);
+        const updateExpiry = function () {
+            const made = $scope.find('[data-date-made]').val();
+            if (!made) {
+                return;
+            }
+            const expiry = new Date(made + 'T00:00:00');
+            expiry.setMonth(expiry.getMonth() + 2);
+            $scope.find('[data-expiry-date]').val(expiry.toISOString().slice(0, 10));
+        };
+        const updateTotal = function () {
+            const remaining = parseInt($scope.find('[data-stock-remaining]').val(), 10) || 0;
+            const pieces = parseInt($scope.find('[data-stock-pieces]').val(), 10) || 0;
+            $scope.find('[data-stock-total]').val(remaining * pieces);
+        };
+        $scope.on('change', '[data-date-made]', updateExpiry);
+        $scope.on('input', '[data-stock-remaining], [data-stock-pieces]', updateTotal);
+        updateTotal();
+    });
 });
