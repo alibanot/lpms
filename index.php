@@ -16,7 +16,10 @@ $stmt = db()->prepare("
     FROM (
         SELECT total, qty FROM sales WHERE sale_type = 'Gerai' AND sale_date BETWEEN ? AND ?
         UNION ALL
-        SELECT total, qty FROM orders WHERE status = 'Completed' AND pickup_date BETWEEN ? AND ?
+        SELECT orders.total, CASE WHEN orders.order_type = 'Frozen' THEN orders.qty * COALESCE(frozen_stock.pieces_per_unit, 1) ELSE orders.qty END AS qty
+        FROM orders
+        LEFT JOIN frozen_stock ON frozen_stock.id = orders.frozen_stock_id
+        WHERE orders.status = 'Completed' AND orders.pickup_date BETWEEN ? AND ?
         UNION ALL
         SELECT deposit_paid AS total, 0 AS qty FROM events WHERE deposit_paid > 0 AND deposit_date BETWEEN ? AND ?
         UNION ALL
