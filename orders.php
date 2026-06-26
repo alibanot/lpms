@@ -240,11 +240,11 @@ include __DIR__ . '/includes/header.php';
                     <div class="row g-3">
                         <div class="col-12 col-md-6">
                             <label class="form-label">Customer Name</label>
-                            <input class="form-control" name="customer_name" value="<?= h($editRow['customer_name'] ?? '') ?>" required>
+                            <input class="form-control" name="customer_name" value="<?= h($editRow['customer_name'] ?? '') ?>">
                         </div>
                         <div class="col-12 col-md-6">
                             <label class="form-label">Phone Number</label>
-                            <input class="form-control" name="phone" inputmode="tel" value="<?= h($editRow['phone'] ?? '') ?>" required>
+                            <input class="form-control" name="phone" inputmode="tel" value="<?= h($editRow['phone'] ?? '') ?>">
                         </div>
                         <div class="col-12 col-md-6">
                             <label class="form-label">Type</label>
