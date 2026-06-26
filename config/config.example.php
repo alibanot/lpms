@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 define('APP_NAME', 'LPMS');
 define('SESSION_TIMEOUT_SECONDS', 1800);
+define('APP_TIMEZONE', 'Asia/Kuala_Lumpur');
 
 define('DB_HOST', 'your_mysql_hostname');
 define('DB_PORT', '3306');
