@@ -3,6 +3,7 @@ $items = [
     ['index.php', 'bi-speedometer2', 'Dashboard'],
     ['sales.php', 'bi-receipt', 'Daily Sales'],
     ['expenses.php', 'bi-wallet2', 'Expenses'],
+    ['cash_out.php', 'bi-cash-coin', 'Cash Out'],
     ['orders.php', 'bi-bag-check', 'Tempahan'],
     ['frozen_stock.php', 'bi-snow2', 'Frozen Stock'],
     ['events.php', 'bi-calendar-event', 'Catering'],
